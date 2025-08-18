@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import Learners from './pages/Learners'
 import AddLearner from './pages/AddLearner'
+import EditLearner from './pages/EditLearner'
 import Courses from './pages/Courses'
 import AddCourse from './pages/AddCourse'
 import Departments from './pages/Departments'
@@ -77,6 +78,14 @@ function App() {
             element={
               <PrivateRoute>
                 <AddLearner />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/learners/edit/:id" 
+            element={
+              <PrivateRoute>
+                <EditLearner />
               </PrivateRoute>
             } 
           />

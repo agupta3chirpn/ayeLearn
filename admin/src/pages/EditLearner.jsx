@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Link } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import DatePicker from 'react-datepicker'
 import "react-datepicker/dist/react-datepicker.css"
@@ -19,8 +19,10 @@ import Sidebar from '../components/Sidebar'
 import Footer from '../components/Footer'
 import { API_CONFIG } from '../config/api'
 
-const AddLearner = () => {
+const EditLearner = () => {
   const { logout } = useAuth()
+  const { id } = useParams()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -34,6 +36,7 @@ const AddLearner = () => {
   })
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [currentImage, setCurrentImage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [errors, setErrors] = useState({})
@@ -41,6 +44,49 @@ const AddLearner = () => {
   const [departments, setDepartments] = useState([])
   const [experienceLevels, setExperienceLevels] = useState([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [learnerLoading, setLearnerLoading] = useState(true)
+
+  // Fetch learner data
+  useEffect(() => {
+    const fetchLearner = async () => {
+      try {
+        const response = await axios.get(`${API_CONFIG.ENDPOINTS.LEARNERS}/${id}`)
+        
+        if (response.data.success) {
+          const learner = response.data.data
+          setFormData({
+            firstName: learner.first_name || '',
+            lastName: learner.last_name || '',
+            dateOfBirth: learner.date_of_birth ? new Date(learner.date_of_birth) : null,
+            gender: learner.gender || 'Male',
+            email: learner.email || '',
+            phone: learner.phone || '',
+            department: learner.department || '',
+            experienceLevel: learner.experience_level || '',
+            status: learner.status || 'active'
+          })
+          
+          if (learner.avatar_url) {
+            setCurrentImage(`${API_CONFIG.BASE_URL}${learner.avatar_url}`)
+          }
+        } else {
+          console.error('Failed to fetch learner:', response.data.message)
+          alert('Failed to fetch learner data. Please try again.')
+          navigate('/learners')
+        }
+      } catch (error) {
+        console.error('Error fetching learner:', error)
+        alert('Failed to fetch learner data. Please try again.')
+        navigate('/learners')
+      } finally {
+        setLearnerLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchLearner()
+    }
+  }, [id, navigate])
 
   // Fetch departments and experience levels
   useEffect(() => {
@@ -77,8 +123,6 @@ const AddLearner = () => {
 
     fetchData()
   }, [])
-
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -175,12 +219,17 @@ const AddLearner = () => {
         status: formData.status
       }
 
-      const response = await axios.post(API_CONFIG.ENDPOINTS.LEARNERS, submitData)
+      // Add avatar URL if new image was uploaded
+      if (avatarUrl) {
+        submitData.avatar_url = avatarUrl
+      }
+
+      const response = await axios.put(`${API_CONFIG.ENDPOINTS.LEARNERS}/${id}`, submitData)
 
       if (response.data.success) {
         setSuccess(true)
         setTimeout(() => {
-          window.location.href = '/learners'
+          navigate('/learners')
         }, 1500)
       } else {
         // Handle server-side validation errors
@@ -213,18 +262,17 @@ const AddLearner = () => {
             }
           }
         } else {
-          setSubmitError(response.data.message || 'Failed to add learner')
+          setSubmitError(response.data.message || 'Failed to update learner')
         }
       }
     } catch (error) {
-      console.error('Error adding learner:', error)
+      console.error('Error updating learner:', error)
       
-      if (error.response?.data?.errors) {
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
         const fieldErrors = {}
         error.response.data.errors.forEach(error => {
           const fieldName = error.path || error.param
           if (fieldName) {
-            // Map backend field names to frontend field names
             const fieldMap = {
               'first_name': 'firstName',
               'last_name': 'lastName',
@@ -248,14 +296,32 @@ const AddLearner = () => {
           }
         }
       } else {
-        setSubmitError(error.response?.data?.message || 'Failed to add learner. Please try again.')
+        setSubmitError(error.response?.data?.message || 'Failed to update learner. Please try again.')
       }
     } finally {
       setLoading(false)
     }
   }
 
-
+  if (learnerLoading || dataLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <main className="flex-1 overflow-y-auto p-6">
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <span className="ml-2 text-gray-600">Loading learner data...</span>
+              </div>
+            </main>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -291,7 +357,7 @@ const AddLearner = () => {
                   <li>
                     <div className="flex items-center">
                       <span className="mx-2 text-gray-400">/</span>
-                      <span className="text-gray-500">Add New Learner</span>
+                      <span className="text-gray-500">Edit Learner</span>
                     </div>
                   </li>
                 </ol>
@@ -307,16 +373,15 @@ const AddLearner = () => {
                       <User className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Add New Learner</h2>
-                      <p className="text-gray-600">Fill in the details below to create a new learner account</p>
+                      <h2 className="text-2xl font-bold text-gray-900">Edit Learner</h2>
+                      <p className="text-gray-600">Update the learner's information below</p>
                     </div>
                   </div>
                 </div>
 
-
                 {success && (
                   <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-green-800">Learner added successfully! Redirecting...</p>
+                    <p className="text-green-800">Learner updated successfully! Redirecting...</p>
                   </div>
                 )}
 
@@ -325,7 +390,7 @@ const AddLearner = () => {
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M10 18a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                       </div>
                       <div className="ml-3">
@@ -335,15 +400,9 @@ const AddLearner = () => {
                   </div>
                 )}
 
-                {dataLoading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                    <p className="text-gray-500">Loading form data...</p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* Personal Information */}
-                    <div className="bg-gray-50 rounded-lg p-6 mb-8">
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  {/* Personal Information */}
+                  <div className="bg-gray-50 rounded-lg p-6 mb-8">
                     <div className="flex items-center mb-6">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                         <User className="w-4 h-4 text-blue-600" />
@@ -481,6 +540,12 @@ const AddLearner = () => {
                             <img 
                               src={imagePreview} 
                               alt="Preview" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : currentImage ? (
+                            <img 
+                              src={currentImage} 
+                              alt="Current" 
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -700,15 +765,14 @@ const AddLearner = () => {
                       {loading ? (
                         <div className="flex items-center">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Adding Learner...
+                          Updating Learner...
                         </div>
                       ) : (
-                        'Add New Learner'
+                        'Update Learner'
                       )}
                     </button>
                   </div>
                 </form>
-                )}
               </div>
             </div>
           </main>
@@ -719,4 +783,4 @@ const AddLearner = () => {
   )
 }
 
-export default AddLearner
+export default EditLearner
