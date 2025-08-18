@@ -45,7 +45,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT id, first_name, last_name, email, phone, date_of_birth, 
-             gender, department, experience_level, avatar_url, 
+             gender, department, experience_level, status, avatar_url, 
              created_at, updated_at
       FROM learners 
       ORDER BY created_at DESC
@@ -71,7 +71,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     
     const [rows] = await pool.execute(`
       SELECT id, first_name, last_name, email, phone, date_of_birth, 
-             gender, department, experience_level, avatar_url, 
+             gender, department, experience_level, status, avatar_url, 
              created_at, updated_at
       FROM learners 
       WHERE id = ?
@@ -192,7 +192,11 @@ router.post('/', [
       }
       return true;
     })
-    .withMessage('Please select a valid Experience Level')
+    .withMessage('Please select a valid Experience Level'),
+  body('status')
+    .optional()
+    .isIn(['active', 'inactive'])
+    .withMessage('Status must be either active or inactive')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -206,7 +210,7 @@ router.post('/', [
 
     const {
       first_name, last_name, email, phone, date_of_birth,
-      gender, department, experience_level
+      gender, department, experience_level, status
     } = req.body;
 
 
@@ -226,9 +230,9 @@ router.post('/', [
 
     const [result] = await pool.execute(`
       INSERT INTO learners (first_name, last_name, email, phone, date_of_birth, 
-                           gender, department, experience_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [first_name, last_name, email, phone || null, date_of_birth || null, gender || null, department, experience_level]);
+                           gender, department, experience_level, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [first_name, last_name, email, phone || null, date_of_birth || null, gender || null, department, experience_level, status || 'active']);
 
     const [newLearner] = await pool.execute(
       'SELECT * FROM learners WHERE id = ?',
@@ -265,7 +269,16 @@ router.put('/:id', [
   body('date_of_birth').optional().isISO8601().withMessage('Valid date format required'),
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender'),
   body('department').optional().trim(),
-  body('experience_level').optional().isIn(['Beginner', 'Intermediate', 'Advanced']).withMessage('Invalid experience level')
+  body('experience_level').optional().trim().custom(async (value) => {
+    if (value && value.trim() !== '') {
+      const [rows] = await pool.execute('SELECT id FROM experience_levels WHERE name = ?', [value]);
+      if (rows.length === 0) {
+        throw new Error('Please select a valid Experience Level');
+      }
+    }
+    return true;
+  }).withMessage('Please select a valid Experience Level'),
+  body('status').optional().isIn(['active', 'inactive']).withMessage('Status must be either active or inactive')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

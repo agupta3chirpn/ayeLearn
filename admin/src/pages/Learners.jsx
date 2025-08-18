@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { 
   Search, 
   ArrowUpDown,
   MoreVertical,
-  User
+  User,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
@@ -15,6 +19,7 @@ import { API_CONFIG } from '../config/api'
 
 const Learners = () => {
   const { logout, user } = useAuth()
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [learners, setLearners] = useState([])
   const [filteredLearners, setFilteredLearners] = useState([])
@@ -24,7 +29,10 @@ const Learners = () => {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
-
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [learnerToDelete, setLearnerToDelete] = useState(null)
 
 
   // Fetch learners data
@@ -61,7 +69,8 @@ const Learners = () => {
       learner.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       learner.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       learner.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      learner.department?.toLowerCase().includes(searchTerm.toLowerCase())
+      learner.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      learner.status?.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
     // Sort learners
@@ -111,6 +120,76 @@ const Learners = () => {
     } catch (error) {
       console.error(`❌ Image URL test failed for ${url}:`, error)
       return false
+    }
+  }
+
+  // Handle click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId && !event.target.closest('.menu-container')) {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openMenuId])
+
+  // Handle learner deletion
+  const handleDeleteLearner = async (learnerId) => {
+    setDeleteLoading(learnerId)
+    try {
+      const response = await axios.delete(`${API_CONFIG.ENDPOINTS.LEARNERS}/${learnerId}`)
+      
+      if (response.data.success) {
+        setLearners(prev => prev.filter(learner => learner.id !== learnerId))
+        console.log('✅ Learner deleted successfully')
+      } else {
+        console.error('Delete API error:', response.data.message)
+        alert('Failed to delete learner. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error deleting learner:', error.response?.data || error.message)
+      alert('Failed to delete learner. Please try again.')
+    } finally {
+      setDeleteLoading(null)
+      setOpenMenuId(null)
+      setShowDeleteModal(false)
+      setLearnerToDelete(null)
+    }
+  }
+
+  // Handle learner status toggle
+  const handleToggleStatus = async (learnerId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
+      const response = await axios.patch(`${API_CONFIG.ENDPOINTS.LEARNERS}/${learnerId}/status`, {
+        status: newStatus
+      })
+      
+      if (response.data.success) {
+        setLearners(prev => prev.map(learner => 
+          learner.id === learnerId 
+            ? { ...learner, status: newStatus }
+            : learner
+        ))
+        console.log('✅ Learner status updated successfully')
+      } else {
+        console.error('Status update API error:', response.data.message)
+        alert('Failed to update learner status. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error updating learner status:', error.response?.data || error.message)
+      alert('Failed to update learner status. Please try again.')
+    }
+  }
+
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800'
+      case 'inactive': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -252,6 +331,9 @@ const Learners = () => {
                             </div>
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Action
                           </th>
                         </tr>
@@ -315,9 +397,58 @@ const Learners = () => {
                               {learner.department}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <button className="text-gray-400 hover:text-gray-600">
+                              <button
+                                onClick={() => handleToggleStatus(learner.id, learner.status)}
+                                className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(learner.status)} hover:opacity-80 transition-opacity`}
+                              >
+                                {learner.status === 'active' ? (
+                                  <>
+                                    <Eye className="w-3 h-3 mr-1" />
+                                    Active
+                                  </>
+                                ) : (
+                                  <>
+                                    <EyeOff className="w-3 h-3 mr-1" />
+                                    Inactive
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap relative">
+                              <button 
+                                className="text-gray-400 hover:text-gray-600 menu-container"
+                                onClick={() => setOpenMenuId(openMenuId === learner.id ? null : learner.id)}
+                              >
                                 <MoreVertical className="w-5 h-5" />
                               </button>
+                              
+                              {openMenuId === learner.id && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 menu-container">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        navigate(`/learners/edit/${learner.id}`)
+                                        setOpenMenuId(null)
+                                      }}
+                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit
+                                    </button>
+                                                                         <button
+                                       onClick={() => {
+                                         setLearnerToDelete(learner)
+                                         setShowDeleteModal(true)
+                                         setOpenMenuId(null)
+                                       }}
+                                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                     >
+                                       <Trash2 className="w-4 h-4 mr-2" />
+                                       Delete
+                                     </button>
+                                  </div>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
@@ -403,6 +534,46 @@ const Learners = () => {
           </main>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && learnerToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Learner</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to delete "{learnerToDelete.first_name} {learnerToDelete.last_name}"? This action cannot be undone.
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setLearnerToDelete(null)
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteLearner(learnerToDelete.id)}
+                  disabled={deleteLoading === learnerToDelete.id}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleteLoading === learnerToDelete.id ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </div>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   )
