@@ -42,11 +42,24 @@ const initializeDatabase = async () => {
         gender ENUM('Male', 'Female', 'Other'),
         department VARCHAR(100),
         experience_level ENUM('Beginner', 'Intermediate', 'Advanced'),
+        status ENUM('active', 'inactive') DEFAULT 'active',
         avatar_url VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    // Add status column to existing learners table if it doesn't exist
+    try {
+      await pool.execute('ALTER TABLE learners ADD COLUMN status ENUM("active", "inactive") DEFAULT "active"');
+      console.log('Status column added to learners table');
+    } catch (error) {
+      if (error.code === 'ER_DUP_FIELDNAME') {
+        console.log('Status column already exists in learners table');
+      } else {
+        console.error('Error adding status column:', error);
+      }
+    }
 
     // Create courses table
     await pool.execute(`
