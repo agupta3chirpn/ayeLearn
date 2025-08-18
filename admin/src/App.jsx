@@ -96,6 +96,7 @@ function App() {
               </PrivateRoute>
             } 
           />
+
           <Route 
             path="/departments" 
             element={

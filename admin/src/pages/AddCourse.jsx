@@ -1,19 +1,38 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { 
   User,
   Bell,
   ChevronDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUpDown,
   Plus,
   X,
   Upload,
-  Send
+  Send,
+  BookOpen,
+  FileText,
+  Users,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  Calendar,
+  Target,
+  Award,
+  FileVideo,
+  FileImage,
+  UserPlus,
+  Filter,
+  Search
 } from 'lucide-react'
 import Logo from '../components/Logo'
+import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
 import Footer from '../components/Footer'
+import { API_CONFIG } from '../config/api'
 
 const AddCourse = () => {
   const { logout } = useAuth()
@@ -48,26 +67,34 @@ const AddCourse = () => {
     practiceFiles: []
   })
 
+  const [modules, setModules] = useState([
+    {
+      id: 1,
+      heading: '',
+      documents: [],
+      videoHeading: '',
+      videos: [],
+      assessmentName: '',
+      assessmentLink: ''
+    }
+  ])
+
   const [assignedLearners, setAssignedLearners] = useState([])
   const [availableLearners, setAvailableLearners] = useState([])
+  const [learnersLoading, setLearnersLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDepartment, setFilterDepartment] = useState('')
+  const [filterLevel, setFilterLevel] = useState('')
+  const [sortBy, setSortBy] = useState('name')
 
   // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('adminToken')
-        if (!token) return
-
-        const response = await fetch('http://localhost:5000/api/admin/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
+        const response = await axios.get(API_CONFIG.ENDPOINTS.ADMIN_PROFILE)
         
-        const data = await response.json()
-        
-        if (data.success) {
-          setProfile(data.profile)
+        if (response.data.success) {
+          setProfile(response.data.profile)
         }
       } catch (error) {
         console.error('Error fetching profile:', error)
@@ -80,23 +107,105 @@ const AddCourse = () => {
   // Fetch learners for assignment
   useEffect(() => {
     const fetchLearners = async () => {
+      setLearnersLoading(true)
       try {
-        const token = localStorage.getItem('adminToken')
-        if (!token) return
-
-        const response = await fetch('http://localhost:5000/api/learners', {
-          headers: {
-            'Authorization': `Bearer ${token}`
+        console.log('🔄 Fetching learners from:', API_CONFIG.ENDPOINTS.LEARNERS)
+        
+        // Try axios first
+        try {
+          const response = await axios.get(API_CONFIG.ENDPOINTS.LEARNERS)
+          
+          console.log('📊 Learners API response:', response.data)
+          console.log('📋 Response status:', response.status)
+          console.log('🔑 Response headers:', response.headers)
+          
+          if (response.data.success) {
+            const learners = response.data.learners || []
+            console.log('✅ Setting available learners:', learners.length, 'learners')
+            console.log('👥 Learners data:', learners)
+            setAvailableLearners(learners)
+          } else {
+            console.error('❌ API returned success: false:', response.data.message)
+            setAvailableLearners([])
           }
-        })
-        
-        const data = await response.json()
-        
-        if (data.success) {
-          setAvailableLearners(data.learners)
+        } catch (axiosError) {
+          console.error('❌ Axios error, trying fetch:', axiosError)
+          
+          // Fallback to fetch
+          const token = localStorage.getItem('adminToken')
+          const fetchResponse = await fetch(API_CONFIG.ENDPOINTS.LEARNERS, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          const fetchData = await fetchResponse.json()
+          console.log('📊 Fetch response:', fetchData)
+          
+          if (fetchData.success) {
+            const learners = fetchData.learners || []
+            console.log('✅ Setting available learners via fetch:', learners.length, 'learners')
+            setAvailableLearners(learners)
+          } else {
+            console.error('❌ Fetch also failed:', fetchData.message)
+            setAvailableLearners([])
+          }
         }
       } catch (error) {
-        console.error('Error fetching learners:', error)
+        console.error('❌ Error fetching learners:', error)
+        console.error('🔍 Error details:', error.response?.data || error.message)
+        console.error('🌐 Network error:', error.message)
+        
+        // Add sample learners for testing if API fails
+        console.log('🔄 Adding sample learners for testing...')
+        const sampleLearners = [
+          {
+            id: 1,
+            first_name: 'John',
+            last_name: 'Doe',
+            email: 'john.doe@example.com',
+            department: 'Cardiology',
+            experience_level: 'Intermediate'
+          },
+          {
+            id: 2,
+            first_name: 'Jane',
+            last_name: 'Smith',
+            email: 'jane.smith@example.com',
+            department: 'Neurology',
+            experience_level: 'Advanced'
+          },
+          {
+            id: 3,
+            first_name: 'Mike',
+            last_name: 'Johnson',
+            email: 'mike.johnson@example.com',
+            department: 'Pediatrics',
+            experience_level: 'Beginner'
+          },
+          {
+            id: 4,
+            first_name: 'Sarah',
+            last_name: 'Wilson',
+            email: 'sarah.wilson@example.com',
+            department: 'Surgery',
+            experience_level: 'Expert'
+          },
+          {
+            id: 5,
+            first_name: 'David',
+            last_name: 'Brown',
+            email: 'david.brown@example.com',
+            department: 'Emergency Medicine',
+            experience_level: 'Intermediate'
+          }
+        ]
+        console.log('✅ Setting sample learners:', sampleLearners.length, 'learners')
+        setAvailableLearners(sampleLearners)
+      } finally {
+        setLearnersLoading(false)
+        console.log('🏁 Learners loading completed')
       }
     }
 
@@ -216,6 +325,86 @@ const AddCourse = () => {
     })
   }
 
+  const selectAllLearners = () => {
+    const filteredLearners = getFilteredLearners()
+    const allLearnerIds = filteredLearners.map(learner => learner.id)
+    setAssignedLearners(allLearnerIds)
+  }
+
+  const clearAllSelections = () => {
+    setAssignedLearners([])
+  }
+
+  const getFilteredLearners = () => {
+    if (!availableLearners || !Array.isArray(availableLearners)) {
+      return []
+    }
+    
+    return availableLearners.filter((learner) => {
+      const firstName = (learner.first_name ?? '').toString().toLowerCase()
+      const lastName = (learner.last_name ?? '').toString().toLowerCase()
+      const department = (learner.department ?? '').toString().toLowerCase()
+      const level = (learner.experience_level ?? '').toString().toLowerCase()
+
+      const search = (searchTerm ?? '').toString().toLowerCase()
+
+      const matchesSearch =
+        firstName.includes(search) ||
+        lastName.includes(search) ||
+        department.includes(search) ||
+        level.includes(search)
+
+      const matchesDepartment =
+        !filterDepartment || (learner.department ?? '') === filterDepartment
+
+      const matchesLevel = !filterLevel || (learner.experience_level ?? '') === filterLevel
+
+      return matchesSearch && matchesDepartment && matchesLevel
+    })
+  }
+
+  const getSortedLearners = (learners) => {
+    return [...learners].sort((a, b) => {
+      switch (sortBy) {
+        case 'name': {
+          const aName = `${a.first_name ?? ''} ${a.last_name ?? ''}`
+          const bName = `${b.first_name ?? ''} ${b.last_name ?? ''}`
+          return aName.localeCompare(bName)
+        }
+        case 'department': {
+          const aDept = (a.department ?? '').toString()
+          const bDept = (b.department ?? '').toString()
+          return aDept.localeCompare(bDept)
+        }
+        case 'level': {
+          const aLevel = (a.experience_level ?? '').toString()
+          const bLevel = (b.experience_level ?? '').toString()
+          return aLevel.localeCompare(bLevel)
+        }
+        default:
+          return 0
+      }
+    })
+  }
+
+  const getUniqueDepartments = () => {
+    if (!availableLearners || !Array.isArray(availableLearners)) {
+      return []
+    }
+    return [...new Set(availableLearners.map((learner) => learner.department ?? ''))].filter(
+      (val) => val !== ''
+    )
+  }
+
+  const getUniqueLevels = () => {
+    if (!availableLearners || !Array.isArray(availableLearners)) {
+      return []
+    }
+    return [...new Set(availableLearners.map((learner) => learner.experience_level ?? ''))].filter(
+      (val) => val !== ''
+    )
+  }
+
   const handleFileUpload = (type, files) => {
     const fileArray = Array.from(files)
     setFileUploads(prev => ({
@@ -231,9 +420,49 @@ const AddCourse = () => {
     }))
   }
 
+  const addModule = () => {
+    const newModule = {
+      id: Date.now(),
+      heading: '',
+      documents: [],
+      videoHeading: '',
+      videos: [],
+      assessmentName: '',
+      assessmentLink: ''
+    }
+    setModules(prev => [...prev, newModule])
+  }
+
+  const removeModule = (moduleId) => {
+    setModules(prev => prev.filter(module => module.id !== moduleId))
+  }
+
+  const updateModule = (moduleId, field, value) => {
+    setModules(prev => prev.map(module => 
+      module.id === moduleId ? { ...module, [field]: value } : module
+    ))
+  }
+
+  const handleModuleFileUpload = (moduleId, type, files) => {
+    const fileArray = Array.from(files)
+    setModules(prev => prev.map(module => 
+      module.id === moduleId 
+        ? { ...module, [type]: [...module[type], ...fileArray] }
+        : module
+    ))
+  }
+
+  const removeModuleFile = (moduleId, type, index) => {
+    setModules(prev => prev.map(module => 
+      module.id === moduleId 
+        ? { ...module, [type]: module[type].filter((_, i) => i !== index) }
+        : module
+    ))
+  }
+
   const getConfigurationStatus = () => {
     const detailsComplete = courseDetails.title && courseDetails.department && courseDetails.level
-    const filesComplete = fileUploads.documents.length > 0 || fileUploads.videos.length > 0 || fileUploads.practiceFiles.length > 0
+    const filesComplete = modules.some(module => module.documents.length > 0 || module.videos.length > 0) || fileUploads.practiceFiles.length > 0
     const learnersComplete = assignedLearners.length > 0
 
     return {
@@ -250,58 +479,35 @@ const AddCourse = () => {
     
     setLoading(true)
     try {
-      const token = localStorage.getItem('adminToken')
-      if (!token) {
-        throw new Error('No authentication token')
-      }
-
       // Create course
-      const courseResponse = await fetch('http://localhost:5000/api/courses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: courseDetails.title,
-          department: courseDetails.department,
-          level: courseDetails.level,
-          estimated_duration: courseDetails.estimatedDuration,
-          deadline: courseDetails.deadline,
-          overview: courseDetails.overview,
-          learning_objectives: courseDetails.learningObjectives,
-          assessment_criteria: courseDetails.assessmentCriteria,
-          key_skills: courseDetails.keySkills
-        })
+      const courseResponse = await axios.post(API_CONFIG.ENDPOINTS.COURSES, {
+        title: courseDetails.title,
+        department: courseDetails.department,
+        level: courseDetails.level,
+        estimated_duration: courseDetails.estimatedDuration,
+        deadline: courseDetails.deadline,
+        overview: courseDetails.overview,
+        learning_objectives: courseDetails.learningObjectives,
+        assessment_criteria: courseDetails.assessmentCriteria,
+        key_skills: courseDetails.keySkills
       })
 
-      const courseData = await courseResponse.json()
-      
-      if (!courseData.success) {
-        throw new Error(courseData.message || 'Failed to create course')
+      if (!courseResponse.data.success) {
+        throw new Error(courseResponse.data.message || 'Failed to create course')
       }
 
       // Assign learners if any are selected
       if (assignedLearners.length > 0) {
-        const assignResponse = await fetch(`http://localhost:5000/api/courses/${courseData.courseId}/assign-learners`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            learner_ids: assignedLearners
-          })
+        const assignResponse = await axios.post(`${API_CONFIG.ENDPOINTS.COURSES}/${courseResponse.data.courseId}/assign-learners`, {
+          learner_ids: assignedLearners
         })
-
-        const assignData = await assignResponse.json()
         
-        if (!assignData.success) {
-          console.warn('Failed to assign learners:', assignData.message)
+        if (!assignResponse.data.success) {
+          console.warn('Failed to assign learners:', assignResponse.data.message)
         }
       }
 
-      // Navigate to courses list
+      // Navigate to courses list after successful creation
       navigate('/courses')
     } catch (error) {
       console.error('Error creating course:', error)
@@ -314,270 +520,253 @@ const AddCourse = () => {
   const status = getConfigurationStatus()
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Top Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Logo width={80} height={65} />
-            <h1 className="text-2xl font-semibold" style={{ color: '#085EB4' }}>Add Course</h1>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-              <Bell className="w-5 h-5" />
-            </button>
-            
-            <div className="relative group">
-              <div className="flex items-center space-x-3 cursor-pointer">
-                <div className="w-8 h-8 bg-gray-300 rounded-full overflow-hidden">
-                  {profile?.profile_image ? (
-                    <img 
-                      src={`http://localhost:5000${profile.profile_image}`}
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-4 h-4 text-gray-400 m-auto" />
-                  )}
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium text-gray-900">
-                    {profile?.first_name && profile?.last_name 
-                      ? `${profile.first_name} ${profile.last_name}`
-                      : profile?.email || 'Admin User'
-                    }
-                  </div>
-                  <div className="text-gray-500">{profile?.email || 'Loading...'}</div>
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
+
+
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}
-        <div className="w-64 bg-white shadow-sm border-r border-gray-200">
-          <nav className="px-4 py-6">
-            <div className="space-y-2">
-              <Link to="/dashboard" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-                <span>Dashboard</span>
-              </Link>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <span>Search</span>
-              </a>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span>Analytics</span>
-              </a>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-white rounded-lg transition-all duration-200" style={{ background: 'linear-gradient(90deg, color(display-p3 0.576 0.200 0.918) 0%, color(display-p3 0.231 0.510 0.965) 100%)' }}>
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <span className="font-medium">Courses</span>
-              </a>
-              
-              <Link to="/learners" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-                <span>Learners</span>
-              </Link>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Help</span>
-              </a>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <span>Bookmarks</span>
-              </a>
-              
-              <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>Settings</span>
-              </a>
-            </div>
-          </nav>
-        </div>
+        <Sidebar />
+
 
         {/* Main Content */}
         <div className="flex-1 flex">
           {/* Main Form Area */}
-          <div className="flex-1 p-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              {/* Steps */}
-              <div className="flex items-center space-x-8 mb-8">
-                <div className={`flex items-center space-x-2 ${activeTab === 'details' ? 'text-blue-600' : 'text-gray-500'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${activeTab === 'details' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                    1
+          <div className="flex-1 p-8">
+            <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 p-10">
+              {/* Enhanced Steps */}
+              <div className="flex items-center justify-center space-x-16 mb-12">
+                <div className={`flex flex-col items-center space-y-3 ${activeTab === 'details' ? 'text-blue-600' : 'text-gray-400'}`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-500 ${
+                    activeTab === 'details' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-2xl scale-110 ring-4 ring-blue-200' 
+                      : 'bg-gray-100 text-gray-500 hover:scale-105'
+                  }`}>
+                    <BookOpen className="w-6 h-6" />
                   </div>
-                  <span>Course Details</span>
+                  <span className="text-base font-semibold">Course Details</span>
+                  {activeTab === 'details' && (
+                    <div className="w-12 h-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full animate-pulse"></div>
+                  )}
                 </div>
-                <div className={`flex items-center space-x-2 ${activeTab === 'files' ? 'text-blue-600' : 'text-gray-500'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${activeTab === 'files' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                    2
+                
+                <div className={`w-24 h-1 rounded-full transition-all duration-500 ${activeTab === 'files' || activeTab === 'learners' ? 'bg-gradient-to-r from-blue-600 to-purple-600' : 'bg-gray-200'}`}></div>
+                
+                <div className={`flex flex-col items-center space-y-3 ${activeTab === 'files' ? 'text-blue-600' : 'text-gray-400'}`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-500 ${
+                    activeTab === 'files' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-2xl scale-110 ring-4 ring-blue-200' 
+                      : 'bg-gray-100 text-gray-500 hover:scale-105'
+                  }`}>
+                    <FileText className="w-6 h-6" />
                   </div>
-                  <span>Course Files</span>
+                  <span className="text-base font-semibold">Course Files</span>
+                  {activeTab === 'files' && (
+                    <div className="w-12 h-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full animate-pulse"></div>
+                  )}
                 </div>
-                <div className={`flex items-center space-x-2 ${activeTab === 'learners' ? 'text-blue-600' : 'text-gray-500'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${activeTab === 'learners' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                    3
+                
+                <div className={`w-24 h-1 rounded-full transition-all duration-500 ${activeTab === 'learners' ? 'bg-gradient-to-r from-blue-600 to-purple-600' : 'bg-gray-200'}`}></div>
+                
+                <div className={`flex flex-col items-center space-y-3 ${activeTab === 'learners' ? 'text-blue-600' : 'text-gray-400'}`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-500 ${
+                    activeTab === 'learners' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-2xl scale-110 ring-4 ring-blue-200' 
+                      : 'bg-gray-100 text-gray-500 hover:scale-105'
+                  }`}>
+                    <Users className="w-6 h-6" />
                   </div>
-                  <span>Assign Learners</span>
+                  <span className="text-base font-semibold">Assign Learners</span>
+                  {activeTab === 'learners' && (
+                    <div className="w-12 h-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full animate-pulse"></div>
+                  )}
                 </div>
               </div>
 
               {/* Tab Content */}
               {activeTab === 'details' && (
                 <div>
-                  <h2 className="text-xl font-semibold mb-6">Add Course Details</h2>
+                  <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Course Details</h2>
+                    <p className="text-lg text-gray-600">Fill in the comprehensive information about your course</p>
+                  </div>
                   
-                  <div className="space-y-6">
-                                         {/* Title */}
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
-                       <input
-                         type="text"
-                         value={courseDetails.title}
-                         onChange={(e) => handleInputChange('title', e.target.value)}
-                         placeholder="Enter title of the course"
-                         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                           errors.title ? 'border-red-500' : 'border-gray-300'
-                         }`}
-                       />
-                       {errors.title && (
-                         <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-                       )}
-                     </div>
-
-                                         {/* Department & Level */}
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                         <select
-                           value={courseDetails.department}
-                           onChange={(e) => handleInputChange('department', e.target.value)}
-                           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                             errors.department ? 'border-red-500' : 'border-gray-300'
-                           }`}
-                         >
-                           <option value="">Select Department</option>
-                           <option value="Cardiology">Cardiology</option>
-                           <option value="Neurology">Neurology</option>
-                           <option value="Pediatrics">Pediatrics</option>
-                           <option value="Endocrinology">Endocrinology</option>
-                           <option value="Surgery">Surgery</option>
-                           <option value="Emergency Medicine">Emergency Medicine</option>
-                           <option value="Radiology">Radiology</option>
-                           <option value="Oncology">Oncology</option>
-                           <option value="Psychiatry">Psychiatry</option>
-                         </select>
-                         {errors.department && (
-                           <p className="mt-1 text-sm text-red-600">{errors.department}</p>
-                         )}
-                       </div>
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Level</label>
-                         <select
-                           value={courseDetails.level}
-                           onChange={(e) => handleInputChange('level', e.target.value)}
-                           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                             errors.level ? 'border-red-500' : 'border-gray-300'
-                           }`}
-                         >
-                           <option value="">Select Level</option>
-                           <option value="Beginner">Beginner</option>
-                           <option value="Intermediate">Intermediate</option>
-                           <option value="Advanced">Advanced</option>
-                         </select>
-                         {errors.level && (
-                           <p className="mt-1 text-sm text-red-600">{errors.level}</p>
-                         )}
-                       </div>
-                     </div>
-
-                    {/* Estimated Duration & Deadline */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Duration</label>
-                        <select
-                          value={courseDetails.estimatedDuration}
-                          onChange={(e) => handleInputChange('estimatedDuration', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          <option value="">Select Estimated Duration</option>
-                          <option value="1-2 weeks">1-2 weeks</option>
-                          <option value="3-4 weeks">3-4 weeks</option>
-                          <option value="1-2 months">1-2 months</option>
-                          <option value="3-6 months">3-6 months</option>
-                        </select>
+                  <div className="w-full space-y-8">
+                    {/* Basic Information */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                          <BookOpen className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Deadline</label>
-                        <select
-                          value={courseDetails.deadline}
-                          onChange={(e) => handleInputChange('deadline', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          <option value="">Select Deadline</option>
-                          <option value="1 week">1 week</option>
-                          <option value="2 weeks">2 weeks</option>
-                          <option value="1 month">1 month</option>
-                          <option value="3 months">3 months</option>
-                        </select>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Course Title*
+                          </label>
+                          <input
+                            type="text"
+                            value={courseDetails.title}
+                            onChange={(e) => handleInputChange('title', e.target.value)}
+                            placeholder="Enter course title"
+                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.title ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          />
+                          {errors.title && (
+                            <div className="mt-2 flex items-center">
+                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <p className="text-sm text-red-600 font-medium">{errors.title}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Department*
+                          </label>
+                          <select
+                            value={courseDetails.department}
+                            onChange={(e) => handleInputChange('department', e.target.value)}
+                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.department ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            <option value="">Select Department</option>
+                            <option value="Cardiology">Cardiology</option>
+                            <option value="Neurology">Neurology</option>
+                            <option value="Pediatrics">Pediatrics</option>
+                            <option value="Endocrinology">Endocrinology</option>
+                            <option value="Surgery">Surgery</option>
+                            <option value="Emergency Medicine">Emergency Medicine</option>
+                            <option value="Radiology">Radiology</option>
+                            <option value="Oncology">Oncology</option>
+                            <option value="Psychiatry">Psychiatry</option>
+                          </select>
+                          {errors.department && (
+                            <div className="mt-2 flex items-center">
+                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <p className="text-sm text-red-600 font-medium">{errors.department}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Experience Level*
+                          </label>
+                          <select
+                            value={courseDetails.level}
+                            onChange={(e) => handleInputChange('level', e.target.value)}
+                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.level ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            <option value="">Select Level</option>
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                          </select>
+                          {errors.level && (
+                            <div className="mt-2 flex items-center">
+                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <p className="text-sm text-red-600 font-medium">{errors.level}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Estimated Duration
+                          </label>
+                          <select
+                            value={courseDetails.estimatedDuration}
+                            onChange={(e) => handleInputChange('estimatedDuration', e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                          >
+                            <option value="">Select Duration</option>
+                            <option value="1-2 weeks">1-2 weeks</option>
+                            <option value="3-4 weeks">3-4 weeks</option>
+                            <option value="1-2 months">1-2 months</option>
+                            <option value="3-6 months">3-6 months</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Course Deadline
+                          </label>
+                          <select
+                            value={courseDetails.deadline}
+                            onChange={(e) => handleInputChange('deadline', e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                          >
+                            <option value="">Select Deadline</option>
+                            <option value="1 week">1 week</option>
+                            <option value="2 weeks">2 weeks</option>
+                            <option value="1 month">1 month</option>
+                            <option value="3 months">3 months</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Overview */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Overview</label>
-                      <textarea
-                        value={courseDetails.overview}
-                        onChange={(e) => handleInputChange('overview', e.target.value)}
-                        placeholder="Add Overview"
-                        rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
+                    {/* Course Overview */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                          <FileText className="w-4 h-4 text-green-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Course Overview</h3>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Overview
+                        </label>
+                        <textarea
+                          value={courseDetails.overview}
+                          onChange={(e) => handleInputChange('overview', e.target.value)}
+                          placeholder="Describe what learners will gain from this course..."
+                          rows={5}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400 resize-none"
+                        />
+                      </div>
                     </div>
 
                     {/* Learning Objectives */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Learning Objectives</label>
-                      <div className="space-y-2">
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                          <Target className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Learning Objectives</h3>
+                      </div>
+                      <div className="space-y-3">
                         {courseDetails.learningObjectives.map((objective, index) => (
-                          <div key={index} className="flex items-center space-x-2">
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-purple-600">{index + 1}</span>
+                            </div>
                             <input
                               type="text"
                               value={objective}
                               onChange={(e) => updateLearningObjective(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Enter learning objective..."
+                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
                             />
                             {courseDetails.learningObjectives.length > 1 && (
                               <button
                                 onClick={() => removeLearningObjective(index)}
-                                className="p-2 text-red-600 hover:text-red-800"
+                                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -586,30 +775,39 @@ const AddCourse = () => {
                         ))}
                         <button
                           onClick={addLearningObjective}
-                          className="flex items-center text-purple-600 hover:text-purple-800"
+                          className="flex items-center text-purple-600 hover:text-purple-800 font-medium transition-colors"
                         >
-                          <Plus className="w-4 h-4 mr-1" />
+                          <Plus className="w-4 h-4 mr-2" />
                           Add Learning Objective
                         </button>
                       </div>
                     </div>
 
                     {/* Assessment Criteria */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Assessment Criteria</label>
-                      <div className="space-y-2">
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                          <Award className="w-4 h-4 text-orange-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Assessment Criteria</h3>
+                      </div>
+                      <div className="space-y-3">
                         {courseDetails.assessmentCriteria.map((criteria, index) => (
-                          <div key={index} className="flex items-center space-x-2">
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-orange-600">{index + 1}</span>
+                            </div>
                             <input
                               type="text"
                               value={criteria}
                               onChange={(e) => updateAssessmentCriteria(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Enter assessment criteria..."
+                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
                             />
                             {courseDetails.assessmentCriteria.length > 1 && (
                               <button
                                 onClick={() => removeAssessmentCriteria(index)}
-                                className="p-2 text-red-600 hover:text-red-800"
+                                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -618,30 +816,39 @@ const AddCourse = () => {
                         ))}
                         <button
                           onClick={addAssessmentCriteria}
-                          className="flex items-center text-purple-600 hover:text-purple-800"
+                          className="flex items-center text-orange-600 hover:text-orange-800 font-medium transition-colors"
                         >
-                          <Plus className="w-4 h-4 mr-1" />
+                          <Plus className="w-4 h-4 mr-2" />
                           Add Assessment Criteria
                         </button>
                       </div>
                     </div>
 
                     {/* Key Skills Developed */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Key Skills Developed</label>
-                      <div className="space-y-2">
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                          <Award className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Key Skills Developed</h3>
+                      </div>
+                      <div className="space-y-3">
                         {courseDetails.keySkills.map((skill, index) => (
-                          <div key={index} className="flex items-center space-x-2">
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-indigo-600">{index + 1}</span>
+                            </div>
                             <input
                               type="text"
                               value={skill}
                               onChange={(e) => updateKeySkill(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Enter key skill..."
+                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
                             />
                             {courseDetails.keySkills.length > 1 && (
                               <button
                                 onClick={() => removeKeySkill(index)}
-                                className="p-2 text-red-600 hover:text-red-800"
+                                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -650,10 +857,10 @@ const AddCourse = () => {
                         ))}
                         <button
                           onClick={addKeySkill}
-                          className="flex items-center text-purple-600 hover:text-purple-800"
+                          className="flex items-center text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
                         >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Key Skills Developed
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Key Skill
                         </button>
                       </div>
                     </div>
@@ -663,137 +870,195 @@ const AddCourse = () => {
 
               {activeTab === 'files' && (
                 <div>
-                  <h2 className="text-xl font-semibold mb-6">Course Files</h2>
+                  <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Course Files</h2>
+                    <p className="text-lg text-gray-600">Upload course materials and resources</p>
+                  </div>
                   
-                  <div className="space-y-6">
-                    {/* Add Module */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="text-lg font-medium mb-4">Add Module</h3>
+                  <div className="w-full space-y-8">
+                    {/* Course Modules */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                            <FileText className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900">Course Modules</h3>
+                        </div>
+                        <button
+                          onClick={addModule}
+                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Module
+                        </button>
+                      </div>
                       
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Module Heading</label>
-                          <input
-                            type="text"
-                            placeholder="Enter module heading"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Document</label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                            <input
-                              type="file"
-                              accept=".pdf,.txt,.doc,.docx"
-                              onChange={(e) => handleFileUpload('documents', e.target.files)}
-                              className="hidden"
-                              id="document-upload"
-                            />
-                            <label htmlFor="document-upload" className="cursor-pointer">
-                              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-sm text-gray-600">Click to upload PDF or Text files (max 1MB)</p>
-                            </label>
-                          </div>
-                          {fileUploads.documents.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {fileUploads.documents.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                  <span className="text-sm text-gray-700">{file.name}</span>
-                                  <button
-                                    onClick={() => removeFile('documents', index)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
+                      <div className="space-y-6">
+                        {modules.map((module, moduleIndex) => (
+                          <div key={module.id} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-bold text-blue-600">{moduleIndex + 1}</span>
                                 </div>
-                              ))}
+                                <h4 className="text-lg font-semibold text-gray-900">Module {moduleIndex + 1}</h4>
+                              </div>
+                              {modules.length > 1 && (
+                                <button
+                                  onClick={() => removeModule(module.id)}
+                                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Video Heading</label>
-                          <input
-                            type="text"
-                            placeholder="Enter video heading"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                            <input
-                              type="file"
-                              accept=".mp4,.avi,.mov,.wmv"
-                              onChange={(e) => handleFileUpload('videos', e.target.files)}
-                              className="hidden"
-                              id="video-upload"
-                            />
-                            <label htmlFor="video-upload" className="cursor-pointer">
-                              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-sm text-gray-600">Click to upload Video files (max 1MB)</p>
-                            </label>
-                          </div>
-                          {fileUploads.videos.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {fileUploads.videos.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                  <span className="text-sm text-gray-700">{file.name}</span>
-                                  <button
-                                    onClick={() => removeFile('videos', index)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
+                            
+                            <div className="space-y-6">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Module Heading
+                                </label>
+                                <input
+                                  type="text"
+                                  value={module.heading}
+                                  onChange={(e) => updateModule(module.id, 'heading', e.target.value)}
+                                  placeholder="Enter module heading"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Upload Documents
+                                </label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.txt,.doc,.docx"
+                                    onChange={(e) => handleModuleFileUpload(module.id, 'documents', e.target.files)}
+                                    className="hidden"
+                                    id={`document-upload-${module.id}`}
+                                  />
+                                  <label htmlFor={`document-upload-${module.id}`} className="cursor-pointer">
+                                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-sm text-gray-600">Click to upload PDF or Text files</p>
+                                    <p className="text-xs text-gray-500">Maximum file size: 1MB</p>
+                                  </label>
                                 </div>
-                              ))}
+                                {module.documents.length > 0 && (
+                                  <div className="mt-4 space-y-2">
+                                    {module.documents.map((file, index) => (
+                                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex items-center space-x-3">
+                                          <FileText className="w-4 h-4 text-blue-500" />
+                                          <span className="text-sm text-gray-700">{file.name}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => removeModuleFile(module.id, 'documents', index)}
+                                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Video Heading
+                                </label>
+                                <input
+                                  type="text"
+                                  value={module.videoHeading}
+                                  onChange={(e) => updateModule(module.id, 'videoHeading', e.target.value)}
+                                  placeholder="Enter video heading"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Upload Videos
+                                </label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept=".mp4,.avi,.mov,.wmv"
+                                    onChange={(e) => handleModuleFileUpload(module.id, 'videos', e.target.files)}
+                                    className="hidden"
+                                    id={`video-upload-${module.id}`}
+                                  />
+                                  <label htmlFor={`video-upload-${module.id}`} className="cursor-pointer">
+                                    <FileVideo className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-sm text-gray-600">Click to upload Video files</p>
+                                    <p className="text-xs text-gray-500">Maximum file size: 1MB</p>
+                                  </label>
+                                </div>
+                                {module.videos.length > 0 && (
+                                  <div className="mt-4 space-y-2">
+                                    {module.videos.map((file, index) => (
+                                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex items-center space-x-3">
+                                          <FileVideo className="w-4 h-4 text-red-500" />
+                                          <span className="text-sm text-gray-700">{file.name}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => removeModuleFile(module.id, 'videos', index)}
+                                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Assessment Details
+                                </label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <input
+                                    type="text"
+                                    value={module.assessmentName}
+                                    onChange={(e) => updateModule(module.id, 'assessmentName', e.target.value)}
+                                    placeholder="Assessment Name"
+                                    className="px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={module.assessmentLink}
+                                    onChange={(e) => updateModule(module.id, 'assessmentLink', e.target.value)}
+                                    placeholder="Assessment Link"
+                                    className="px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                                  />
+                                </div>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Assessment Details</label>
-                          <div className="grid grid-cols-2 gap-4">
-                            <input
-                              type="text"
-                              placeholder="Assessment Name"
-                              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Assessment Link"
-                              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            />
                           </div>
-                        </div>
-                        
-                        <div className="flex space-x-3">
-                          <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                            Add Module
-                          </button>
-                          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                            Cancel
-                          </button>
-                        </div>
+                        ))}
                       </div>
                     </div>
-                    
-                    <div className="text-center">
-                      <button className="text-purple-600 hover:text-purple-800">
-                        Click to add another module to the course
-                      </button>
-                    </div>
-                    
+
                     {/* Practice Files */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="text-lg font-medium mb-4">Practice Files</h3>
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                          <FileImage className="w-4 h-4 text-green-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Practice Files</h3>
+                      </div>
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Practice Files</label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Upload Practice Files
+                          </label>
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-400 transition-colors">
                             <input
                               type="file"
                               accept=".pdf,.txt,.doc,.docx"
@@ -802,18 +1067,22 @@ const AddCourse = () => {
                               id="practice-files-upload"
                             />
                             <label htmlFor="practice-files-upload" className="cursor-pointer">
-                              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-sm text-gray-600">Click to upload PDF or Text files (max 5MB)</p>
+                              <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                              <p className="text-sm text-gray-600 mb-1">Click to upload PDF or Text files</p>
+                              <p className="text-xs text-gray-500">Maximum file size: 5MB</p>
                             </label>
                           </div>
                           {fileUploads.practiceFiles.length > 0 && (
-                            <div className="mt-2 space-y-1">
+                            <div className="mt-4 space-y-2">
                               {fileUploads.practiceFiles.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                  <span className="text-sm text-gray-700">{file.name}</span>
+                                <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                  <div className="flex items-center space-x-3">
+                                    <FileText className="w-4 h-4 text-green-500" />
+                                    <span className="text-sm text-gray-700">{file.name}</span>
+                                  </div>
                                   <button
                                     onClick={() => removeFile('practiceFiles', index)}
-                                    className="text-red-600 hover:text-red-800"
+                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -823,71 +1092,262 @@ const AddCourse = () => {
                           )}
                         </div>
                         
-                        <div className="flex space-x-3">
-                          <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <div className="flex space-x-4">
+                          <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
                             Add File
                           </button>
-                          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                          <button className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                             Cancel
                           </button>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <button className="text-purple-600 hover:text-purple-800">
-                        Click to add practice files or supporting documents to the course
-                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
               {activeTab === 'learners' && (
-                <div>
-                  <h2 className="text-xl font-semibold mb-6">Assign Learners</h2>
+                <div className="w-full">
+                  <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+                    🔍 DEBUG: Step 3 is rendering! Active Tab: {activeTab} | 
+                    Learners Loading: {learnersLoading ? 'Yes' : 'No'} | 
+                    Available Learners: {availableLearners?.length || 0} | 
+                    Filtered Learners: {getFilteredLearners().length}
+                  </div>
+                  <div className="text-center mb-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Assign Learners</h2>
+                    <p className="text-gray-600">Select learners to enroll in this course</p>
+                  </div>
                   
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          placeholder="Search"
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                      <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        Sort
-                      </button>
-                      <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        Filter
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {availableLearners.map((learner) => (
-                        <div key={learner.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-gray-400" />
-                            </div>
-                            <div>
-                              <div className="font-medium">{learner.first_name} {learner.last_name}</div>
-                              <div className="text-sm text-gray-500">{learner.department} • {learner.experience_level}</div>
-                            </div>
+                  <div className="w-full space-y-6">
+                    {/* Course Summary Card */}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                            <BookOpen className="w-6 h-6 text-white" />
                           </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{courseDetails.title || 'Course Title'}</h3>
+                            <p className="text-sm text-gray-600">
+                              {courseDetails.department} • {courseDetails.level} • {courseDetails.estimatedDuration}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Ready to assign learners</p>
+                          {learnersLoading ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              <p className="text-lg font-semibold text-blue-600">Loading learners...</p>
+                            </div>
+                          ) : (
+                            <p className="text-lg font-semibold text-blue-600">{availableLearners?.length || 0} learners available</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search and Filter Bar */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1 relative">
                           <input
-                            type="checkbox"
-                            checked={assignedLearners.includes(learner.id)}
-                            onChange={() => toggleLearnerAssignment(learner.id)}
-                            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search learners by name, department, or experience level..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        </div>
+                        <select
+                          value={filterDepartment}
+                          onChange={(e) => setFilterDepartment(e.target.value)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">All Departments</option>
+                          {getUniqueDepartments().map(dept => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={filterLevel}
+                          onChange={(e) => setFilterLevel(e.target.value)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">All Levels</option>
+                          {getUniqueLevels().map(level => (
+                            <option key={level} value={level}>{level}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => {
+                            setSearchTerm('')
+                            setFilterDepartment('')
+                            setFilterLevel('')
+                          }}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Learners Grid */}
+                    {learnersLoading ? (
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading learners...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {getSortedLearners(getFilteredLearners()).map((learner) => (
+                        <div key={learner.id} className={`bg-white rounded-lg border-2 p-4 hover:shadow-md transition-all duration-200 cursor-pointer ${
+                          assignedLearners.includes(learner.id) 
+                            ? 'border-green-500 bg-green-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`} onClick={() => toggleLearnerAssignment(learner.id)}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                <User className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900 text-sm">
+                                  {learner.first_name} {learner.last_name}
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  {learner.department || 'Not specified'} • {learner.experience_level}
+                                </p>
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={assignedLearners.includes(learner.id)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                toggleLearnerAssignment(learner.id)
+                              }}
+                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 transition-colors"
+                            />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex space-x-1">
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {learner.department || 'General'}
+                              </span>
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {learner.experience_level}
+                              </span>
+                            </div>
+                            <span className={`text-xs font-medium ${
+                              assignedLearners.includes(learner.id) 
+                                ? 'text-green-600' 
+                                : 'text-gray-400'
+                            }`}>
+                              {assignedLearners.includes(learner.id) ? 'Selected' : 'Not Selected'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!learnersLoading && getFilteredLearners().length === 0 && (
+                      <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+                        <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500 mb-2">
+                          {(availableLearners?.length || 0) === 0 
+                            ? 'No learners available for assignment' 
+                            : 'No learners match your search criteria'
+                          }
+                        </p>
+                        <p className="text-sm text-gray-400">Try adjusting your search or filter criteria</p>
+                      </div>
+                    )}
+
+                    {/* Selection Summary */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <Users className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Learner Assignment Summary</h3>
+                            <p className="text-sm text-gray-500">
+                              {assignedLearners.length} of {availableLearners?.length || 0} learners selected
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={selectAllLearners}
+                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            onClick={clearAllSelections}
+                            className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {assignedLearners.length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="text-center">
+                              <p className="text-2xl font-bold text-blue-600">{assignedLearners.length}</p>
+                              <p className="text-sm text-gray-600">Learners Selected</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-2xl font-bold text-green-600">
+                                {Math.round((assignedLearners.length / (availableLearners?.length || 1)) * 100)}%
+                              </p>
+                              <p className="text-sm text-gray-600">Coverage Rate</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-2xl font-bold text-purple-600">
+                                {(availableLearners?.length || 0) - assignedLearners.length}
+                              </p>
+                              <p className="text-sm text-gray-600">Remaining</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {assignedLearners.length === 0 && (
+                        <div className="text-center py-6">
+                          <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500 mb-2">No learners selected yet</p>
+                          <p className="text-sm text-gray-400">Select learners from the grid above to assign them to this course</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ready to Publish Message */}
+                    {assignedLearners.length > 0 && (
+                      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 p-6">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">Ready to Publish Course!</h3>
+                            <p className="text-sm text-gray-600">
+                              Your course "{courseDetails.title}" is ready with {assignedLearners.length} learners assigned. 
+                              Click "Publish Course" to make it live.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -895,18 +1355,21 @@ const AddCourse = () => {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-80 bg-white border-l border-gray-200 p-6">
+          <div className="w-80 bg-white border-l border-gray-200 p-6 shadow-lg">
             {/* Actions */}
             <div className="mb-8">
-              <h3 className="text-lg font-medium mb-4">Actions</h3>
-              <div className="space-y-3">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <Send className="w-5 h-5 mr-2 text-blue-600" />
+                Actions
+              </h3>
+              <div className="space-y-4">
                 <button 
                   onClick={() => {
                     if (activeTab === 'files') setActiveTab('details')
                     else if (activeTab === 'learners') setActiveTab('files')
                     else navigate('/courses')
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center"
+                  className="w-full px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 flex items-center justify-center font-medium transition-all duration-200"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
@@ -915,24 +1378,33 @@ const AddCourse = () => {
                   <button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 flex items-center justify-center disabled:opacity-50"
+                    className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 flex items-center justify-center font-semibold disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     {loading ? (
-                      'Publishing...'
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Publishing...
+                      </div>
                     ) : (
                       <>
                         <Send className="w-4 h-4 mr-2" />
-                        Publish
+                        Publish Course
                       </>
                     )}
                   </button>
                 ) : (
                   <button
                     onClick={() => {
-                      if (activeTab === 'details') setActiveTab('files')
-                      else if (activeTab === 'files') setActiveTab('learners')
+                      console.log('Button clicked! Current activeTab:', activeTab)
+                      if (activeTab === 'details') {
+                        console.log('Setting activeTab to files')
+                        setActiveTab('files')
+                      } else if (activeTab === 'files') {
+                        console.log('Setting activeTab to learners')
+                        setActiveTab('learners')
+                      }
                     }}
-                    className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 flex items-center justify-center"
+                    className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 flex items-center justify-center font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     <ArrowRight className="w-4 h-4 mr-2" />
                     Continue
@@ -941,27 +1413,110 @@ const AddCourse = () => {
               </div>
             </div>
 
-            {/* Configuration Status */}
-            <div>
-              <h3 className="text-lg font-medium mb-4">Configuration Status</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Course Details:</span>
-                  <span className={`text-sm font-medium ${status.details === 'Added' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {status.details}
-                  </span>
+            {/* Simple Progress Status */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Configuration Status</h3>
+                <span className="text-sm text-gray-500">
+                  {Object.values(status).filter(s => s === 'Added' || s === 'Uploaded' || s === 'Assigned').length}/3 complete
+                </span>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Course Details */}
+                <div className="relative p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center space-x-4 mb-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      status.details === 'Added' ? 'bg-green-500' : 'bg-blue-100'
+                    }`}>
+                      <BookOpen className={`w-5 h-5 ${
+                        status.details === 'Added' ? 'text-white' : 'text-blue-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Course Details</h4>
+                      <p className="text-sm text-gray-500">
+                        {status.details === 'Added' ? 'Basic information completed' : 'Add course title and description'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    {status.details === 'Added' ? (
+                      <div className="flex items-center space-x-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium text-sm">Complete</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                        <span className="font-medium text-sm">Pending</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Course Files:</span>
-                  <span className={`text-sm font-medium ${status.files === 'Uploaded' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {status.files}
-                  </span>
+
+                {/* Course Files */}
+                <div className="relative p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center space-x-4 mb-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      status.files === 'Uploaded' ? 'bg-green-500' : 'bg-purple-100'
+                    }`}>
+                      <FileText className={`w-5 h-5 ${
+                        status.files === 'Uploaded' ? 'text-white' : 'text-purple-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Course Files</h4>
+                      <p className="text-sm text-gray-500">
+                        {status.files === 'Uploaded' ? 'All files uploaded successfully' : 'Upload modules and practice files'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    {status.files === 'Uploaded' ? (
+                      <div className="flex items-center space-x-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium text-sm">Complete</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                        <span className="font-medium text-sm">Pending</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Learners:</span>
-                  <span className={`text-sm font-medium ${status.learners === 'Assigned' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {status.learners}
-                  </span>
+
+                {/* Learners */}
+                <div className="relative p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center space-x-4 mb-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      status.learners === 'Assigned' ? 'bg-green-500' : 'bg-green-100'
+                    }`}>
+                      <Users className={`w-5 h-5 ${
+                        status.learners === 'Assigned' ? 'text-white' : 'text-green-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Learners</h4>
+                      <p className="text-sm text-gray-500">
+                        {status.learners === 'Assigned' ? 'Learners assigned to course' : 'Select learners to enroll'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    {status.learners === 'Assigned' ? (
+                      <div className="flex items-center space-x-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium text-sm">Complete</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                        <span className="font-medium text-sm">Pending</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
