@@ -121,7 +121,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT 
         c.*,
-        COUNT(cl.learner_id) as assigned_learners_count,
+        COUNT(DISTINCT cl.learner_id) as assigned_learners_count,
         COUNT(DISTINCT cm.id) as modules_count,
         COUNT(DISTINCT cf.id) as files_count
       FROM courses c
