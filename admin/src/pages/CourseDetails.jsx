@@ -280,7 +280,7 @@ const CourseDetails = () => {
                         onClick={() => toggleModule(module.id || index)}
                         className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50"
                       >
-                        <h3 className="text-lg font-medium text-gray-900">{module.title}</h3>
+                        <h3 className="text-lg font-medium text-gray-900">{module.heading}</h3>
                         <svg 
                           className={`w-5 h-5 text-gray-400 transform transition-transform ${
                             expandedModules[module.id || index] ? 'rotate-180' : ''
@@ -294,13 +294,7 @@ const CourseDetails = () => {
                       </button>
                       
                                              {expandedModules[module.id || index] && (
-                         <div className="px-4 pb-4">
-                           <div className="mb-4">
-                             <h4 className="text-sm font-medium text-gray-700 mb-2">Content:</h4>
-                             <div className="text-sm text-gray-600">
-                               {module.content || 'No content available'}
-                             </div>
-                           </div>
+                                                   <div className="px-4 pb-4">
                            
                            {module.assessment_name && (
                              <div>
@@ -316,11 +310,21 @@ const CourseDetails = () => {
                                <h4 className="text-sm font-medium text-gray-700 mb-2">Documents:</h4>
                                <div className="space-y-2">
                                  {module.documents.map((doc, docIdx) => (
-                                   <div key={docIdx} className="flex items-center space-x-2 text-sm text-gray-600">
-                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <div key={docIdx} className="flex items-center space-x-2 text-sm">
+                                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                      </svg>
-                                     <span>{doc.originalName || doc.fileName || 'Document'}</span>
+                                                                           <a 
+                                        href={`http://localhost:5000${doc.file_path}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                                      >
+                                        <span>{doc.original_name || doc.file_name || 'Document'}</span>
+                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                       </svg>
+                                     </a>
                                    </div>
                                  ))}
                                </div>
@@ -332,11 +336,21 @@ const CourseDetails = () => {
                                <h4 className="text-sm font-medium text-gray-700 mb-2">Videos:</h4>
                                <div className="space-y-2">
                                  {module.videos.map((video, videoIdx) => (
-                                   <div key={videoIdx} className="flex items-center space-x-2 text-sm text-gray-600">
-                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <div key={videoIdx} className="flex items-center space-x-2 text-sm">
+                                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                      </svg>
-                                     <span>{video.originalName || video.fileName || 'Video'}</span>
+                                                                           <a 
+                                        href={`http://localhost:5000${video.file_path}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                                      >
+                                        <span>{video.original_name || video.file_name || 'Video'}</span>
+                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                       </svg>
+                                     </a>
                                    </div>
                                  ))}
                                </div>
