@@ -55,6 +55,9 @@ const AddCourse = () => {
   })
 
   const [errors, setErrors] = useState({})
+  const [departments, setDepartments] = useState([])
+  const [experienceLevels, setExperienceLevels] = useState([])
+  const [isLoadingData, setIsLoadingData] = useState(true)
 
   const [courseFiles, setCourseFiles] = useState({
     modules: [],
@@ -101,21 +104,36 @@ const AddCourse = () => {
   const [filterLevel, setFilterLevel] = useState('')
   const [sortBy, setSortBy] = useState('name')
 
-  // Fetch profile data
+  // Fetch profile data, departments, and experience levels
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchInitialData = async () => {
+      setIsLoadingData(true)
       try {
-        const response = await axios.get(API_CONFIG.ENDPOINTS.ADMIN_PROFILE)
-        
-        if (response.data.success) {
-          setProfile(response.data.profile)
+        // Fetch profile
+        const profileResponse = await axios.get(API_CONFIG.ENDPOINTS.ADMIN_PROFILE)
+        if (profileResponse.data.success) {
+          setProfile(profileResponse.data.profile)
+        }
+
+        // Fetch departments
+        const departmentsResponse = await axios.get(API_CONFIG.ENDPOINTS.DEPARTMENTS)
+        if (departmentsResponse.data.success) {
+          setDepartments(departmentsResponse.data.data || [])
+        }
+
+        // Fetch experience levels
+        const levelsResponse = await axios.get(API_CONFIG.ENDPOINTS.EXPERIENCE_LEVELS)
+        if (levelsResponse.data.success) {
+          setExperienceLevels(levelsResponse.data.data || [])
         }
       } catch (error) {
-        console.error('Error fetching profile:', error)
+        console.error('Error fetching initial data:', error)
+      } finally {
+        setIsLoadingData(false)
       }
     }
 
-    fetchProfile()
+    fetchInitialData()
   }, [])
 
   // Fetch learners for assignment
@@ -161,38 +179,76 @@ const AddCourse = () => {
   const validateForm = () => {
     const newErrors = {}
     
+    // Title validation
     if (!courseDetails.title.trim()) {
-      newErrors.title = 'Title is required'
+      newErrors.title = 'Course title is required'
+    } else if (courseDetails.title.trim().length < 5) {
+      newErrors.title = 'Course title must be at least 5 characters long'
+    } else if (courseDetails.title.trim().length > 255) {
+      newErrors.title = 'Course title must be less than 255 characters'
     }
     
+    // Estimated Duration validation
+    if (!courseDetails.estimatedDuration) {
+      newErrors.estimatedDuration = 'Estimated duration is required'
+    }
+    
+    // Course Deadline validation
+    if (!courseDetails.deadline) {
+      newErrors.deadline = 'Course deadline is required'
+    }
+    
+    // Department validation
     if (!courseDetails.department) {
-      newErrors.department = 'Department is required'
+      newErrors.department = 'Please select a department'
     }
     
+    // Level validation
     if (!courseDetails.level) {
-      newErrors.level = 'Level is required'
+      newErrors.level = 'Please select an experience level'
     }
     
+    // Overview validation
     if (!courseDetails.overview.trim()) {
-      newErrors.overview = 'Overview is required'
+      newErrors.overview = 'Course overview is required'
+    } else if (courseDetails.overview.trim().length < 20) {
+      newErrors.overview = 'Course overview must be at least 20 characters long'
     }
     
-    // Validate learning objectives
+    // Learning objectives validation
     const validLearningObjectives = courseDetails.learningObjectives.filter(obj => obj.trim() !== '')
     if (validLearningObjectives.length === 0) {
       newErrors.learningObjectives = 'At least one learning objective is required'
+    } else {
+      // Check each learning objective for minimum length
+      const invalidObjectives = validLearningObjectives.filter(obj => obj.trim().length < 10)
+      if (invalidObjectives.length > 0) {
+        newErrors.learningObjectives = 'Each learning objective must be at least 10 characters long'
+      }
     }
     
-    // Validate assessment criteria
+    // Assessment criteria validation
     const validAssessmentCriteria = courseDetails.assessmentCriteria.filter(criteria => criteria.trim() !== '')
     if (validAssessmentCriteria.length === 0) {
       newErrors.assessmentCriteria = 'At least one assessment criteria is required'
+    } else {
+      // Check each assessment criteria for minimum length
+      const invalidCriteria = validAssessmentCriteria.filter(criteria => criteria.trim().length < 10)
+      if (invalidCriteria.length > 0) {
+        newErrors.assessmentCriteria = 'Each assessment criteria must be at least 10 characters long'
+      }
     }
     
-    // Validate key skills
+    // Key skills validation
     const validKeySkills = courseDetails.keySkills.filter(skill => skill.trim() !== '')
     if (validKeySkills.length === 0) {
       newErrors.keySkills = 'At least one key skill is required'
+    } else {
+      // Check each key skill for minimum length
+      const invalidSkills = validKeySkills.filter(skill => skill.trim().length < 5)
+      if (invalidSkills.length > 0) {
+        newErrors.keySkills = 'Each key skill must be at least 5 characters long'
+      }
     }
     
     setErrors(newErrors)
@@ -664,7 +720,8 @@ const AddCourse = () => {
   }
 
   const getConfigurationStatus = () => {
-    const detailsComplete = courseDetails.title && courseDetails.department && courseDetails.level && courseDetails.overview.trim() &&
+    const detailsComplete = courseDetails.title && courseDetails.department && courseDetails.level && 
+      courseDetails.estimatedDuration && courseDetails.deadline && courseDetails.overview.trim() &&
       courseDetails.learningObjectives.some(obj => obj.trim() !== '') &&
       courseDetails.assessmentCriteria.some(criteria => criteria.trim() !== '') &&
       courseDetails.keySkills.some(skill => skill.trim() !== '')
@@ -734,6 +791,17 @@ const AddCourse = () => {
   }
 
   const status = getConfigurationStatus()
+
+  // Consistent error display component
+  const ErrorMessage = ({ error }) => {
+    if (!error) return null
+    return (
+      <div className="mt-2 flex items-center">
+        <AlertCircle className="h-4 w-4 text-red-500 mr-1" />
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -823,23 +891,21 @@ const AddCourse = () => {
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Course Title*
                           </label>
-                          <input
-                            type="text"
-                            value={courseDetails.title}
-                            onChange={(e) => handleInputChange('title', e.target.value)}
-                            placeholder="Enter course title"
-                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                              errors.title ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
-                            }`}
-                          />
-                          {errors.title && (
-                            <div className="mt-2 flex items-center">
-                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <p className="text-sm text-red-600 font-medium">{errors.title}</p>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={courseDetails.title}
+                              onChange={(e) => handleInputChange('title', e.target.value)}
+                              placeholder="Enter course title"
+                              className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                                errors.title ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                              {courseDetails.title.length}/255
                             </div>
-                          )}
+                          </div>
+                          <ErrorMessage error={errors.title} />
                         </div>
                         
                         <div>
@@ -849,29 +915,24 @@ const AddCourse = () => {
                           <select
                             value={courseDetails.department}
                             onChange={(e) => handleInputChange('department', e.target.value)}
+                            disabled={isLoadingData}
                             className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                               errors.department ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
-                            }`}
+                            } ${isLoadingData ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                            style={{
+                              paddingRight: '2.5rem'
+                            }}
                           >
-                            <option value="">Select Department</option>
-                            <option value="Cardiology">Cardiology</option>
-                            <option value="Neurology">Neurology</option>
-                            <option value="Pediatrics">Pediatrics</option>
-                            <option value="Endocrinology">Endocrinology</option>
-                            <option value="Surgery">Surgery</option>
-                            <option value="Emergency Medicine">Emergency Medicine</option>
-                            <option value="Radiology">Radiology</option>
-                            <option value="Oncology">Oncology</option>
-                            <option value="Psychiatry">Psychiatry</option>
+                            <option value="">
+                              {isLoadingData ? 'Loading departments...' : 'Select Department'}
+                            </option>
+                            {departments.map((dept) => (
+                              <option key={dept.id} value={dept.name}>
+                                {dept.name}
+                              </option>
+                            ))}
                           </select>
-                          {errors.department && (
-                            <div className="mt-2 flex items-center">
-                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <p className="text-sm text-red-600 font-medium">{errors.department}</p>
-                            </div>
-                          )}
+                          <ErrorMessage error={errors.department} />
                         </div>
                         
                         <div>
@@ -881,33 +942,39 @@ const AddCourse = () => {
                           <select
                             value={courseDetails.level}
                             onChange={(e) => handleInputChange('level', e.target.value)}
+                            disabled={isLoadingData}
                             className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                               errors.level ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
-                            }`}
+                            } ${isLoadingData ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                            style={{
+                              paddingRight: '2.5rem'
+                            }}
                           >
-                            <option value="">Select Level</option>
-                            <option value="Beginner">Beginner</option>
-                            <option value="Intermediate">Intermediate</option>
-                            <option value="Advanced">Advanced</option>
+                            <option value="">
+                              {isLoadingData ? 'Loading experience levels...' : 'Select Level'}
+                            </option>
+                            {experienceLevels.map((level) => (
+                              <option key={level.id} value={level.name}>
+                                {level.name}
+                              </option>
+                            ))}
                           </select>
-                          {errors.level && (
-                            <div className="mt-2 flex items-center">
-                              <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <p className="text-sm text-red-600 font-medium">{errors.level}</p>
-                            </div>
-                          )}
+                          <ErrorMessage error={errors.level} />
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Estimated Duration
+                            Estimated Duration*
                           </label>
                           <select
                             value={courseDetails.estimatedDuration}
                             onChange={(e) => handleInputChange('estimatedDuration', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.estimatedDuration ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                            style={{
+                              paddingRight: '2.5rem'
+                            }}
                           >
                             <option value="">Select Duration</option>
                             <option value="1-2 weeks">1-2 weeks</option>
@@ -915,23 +982,29 @@ const AddCourse = () => {
                             <option value="1-2 months">1-2 months</option>
                             <option value="3-6 months">3-6 months</option>
                           </select>
+                          <ErrorMessage error={errors.estimatedDuration} />
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Course Deadline
+                            Course Deadline*
                           </label>
-                          <select
-                            value={courseDetails.deadline}
-                            onChange={(e) => handleInputChange('deadline', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
-                          >
-                            <option value="">Select Deadline</option>
-                            <option value="1 week">1 week</option>
-                            <option value="2 weeks">2 weeks</option>
-                            <option value="1 month">1 month</option>
-                            <option value="3 months">3 months</option>
-                          </select>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={courseDetails.deadline}
+                              onChange={(e) => handleInputChange('deadline', e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              onClick={(e) => {
+                                e.target.showPicker();
+                              }}
+                              className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer ${
+                                errors.deadline ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                              placeholder="Select deadline date"
+                            />
+                          </div>
+                          <ErrorMessage error={errors.deadline} />
                         </div>
                       </div>
                     </div>
@@ -948,23 +1021,21 @@ const AddCourse = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Overview
                         </label>
-                        <textarea
-                          value={courseDetails.overview}
-                          onChange={(e) => handleInputChange('overview', e.target.value)}
-                          placeholder="Describe what learners will gain from this course..."
-                          rows={5}
-                          className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none ${
-                            errors.overview ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
-                          }`}
-                        />
-                        {errors.overview && (
-                          <div className="mt-2 flex items-center">
-                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-sm text-red-600 font-medium">{errors.overview}</p>
+                        <div className="relative">
+                          <textarea
+                            value={courseDetails.overview}
+                            onChange={(e) => handleInputChange('overview', e.target.value)}
+                            placeholder="Describe what learners will gain from this course... (minimum 20 characters)"
+                            rows={5}
+                            className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none ${
+                              errors.overview ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          />
+                          <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                            {courseDetails.overview.length} characters
                           </div>
-                        )}
+                        </div>
+                        <ErrorMessage error={errors.overview} />
                       </div>
                     </div>
 
@@ -982,13 +1053,18 @@ const AddCourse = () => {
                             <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                               <span className="text-xs font-bold text-purple-600">{index + 1}</span>
                             </div>
-                            <input
-                              type="text"
-                              value={objective}
-                              onChange={(e) => updateLearningObjective(index, e.target.value)}
-                              placeholder="Enter learning objective..."
-                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
-                            />
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                value={objective}
+                                onChange={(e) => updateLearningObjective(index, e.target.value)}
+                                placeholder="Enter learning objective... (minimum 10 characters)"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                                {objective.length}
+                              </div>
+                            </div>
                             {courseDetails.learningObjectives.length > 1 && (
                               <button
                                 onClick={() => removeLearningObjective(index)}
@@ -1006,14 +1082,7 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Learning Objective
                         </button>
-                        {errors.learningObjectives && (
-                          <div className="mt-2 flex items-center">
-                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-sm text-red-600 font-medium">{errors.learningObjectives}</p>
-                          </div>
-                        )}
+                        <ErrorMessage error={errors.learningObjectives} />
                       </div>
                     </div>
 
@@ -1031,13 +1100,18 @@ const AddCourse = () => {
                             <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                               <span className="text-xs font-bold text-orange-600">{index + 1}</span>
                             </div>
-                            <input
-                              type="text"
-                              value={criteria}
-                              onChange={(e) => updateAssessmentCriteria(index, e.target.value)}
-                              placeholder="Enter assessment criteria..."
-                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
-                            />
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                value={criteria}
+                                onChange={(e) => updateAssessmentCriteria(index, e.target.value)}
+                                placeholder="Enter assessment criteria... (minimum 10 characters)"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                                {criteria.length}
+                              </div>
+                            </div>
                             {courseDetails.assessmentCriteria.length > 1 && (
                               <button
                                 onClick={() => removeAssessmentCriteria(index)}
@@ -1055,14 +1129,7 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Assessment Criteria
                         </button>
-                        {errors.assessmentCriteria && (
-                          <div className="mt-2 flex items-center">
-                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-sm text-red-600 font-medium">{errors.assessmentCriteria}</p>
-                          </div>
-                        )}
+                        <ErrorMessage error={errors.assessmentCriteria} />
                       </div>
                     </div>
 
@@ -1080,13 +1147,18 @@ const AddCourse = () => {
                             <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                               <span className="text-xs font-bold text-indigo-600">{index + 1}</span>
                             </div>
-                            <input
-                              type="text"
-                              value={skill}
-                              onChange={(e) => updateKeySkill(index, e.target.value)}
-                              placeholder="Enter key skill..."
-                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
-                            />
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                value={skill}
+                                onChange={(e) => updateKeySkill(index, e.target.value)}
+                                placeholder="Enter key skill... (minimum 5 characters)"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400"
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                                {skill.length}
+                              </div>
+                            </div>
                             {courseDetails.keySkills.length > 1 && (
                               <button
                                 onClick={() => removeKeySkill(index)}
@@ -1104,14 +1176,7 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Key Skill
                         </button>
-                        {errors.keySkills && (
-                          <div className="mt-2 flex items-center">
-                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-sm text-red-600 font-medium">{errors.keySkills}</p>
-                          </div>
-                        )}
+                        <ErrorMessage error={errors.keySkills} />
                       </div>
                     </div>
                   </div>
@@ -1733,9 +1798,8 @@ const AddCourse = () => {
                       if (activeTab === 'details') {
                         if (validateForm()) {
                           setActiveTab('files')
-                        } else {
-                          alert('Please fill in all required fields before continuing.')
                         }
+                        // Validation errors will be shown inline
                       } else if (activeTab === 'files') {
                         if (validateStep2()) {
                           setActiveTab('learners')
