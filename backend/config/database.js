@@ -67,7 +67,7 @@ const initializeDatabase = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         department VARCHAR(100) NOT NULL,
-        level ENUM('Beginner', 'Intermediate', 'Advanced') NOT NULL,
+        level VARCHAR(100) NOT NULL,
         estimated_duration VARCHAR(50),
         deadline VARCHAR(50),
         overview TEXT,
@@ -78,6 +78,18 @@ const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    // Update existing courses table to change level field from ENUM to VARCHAR
+    try {
+      await pool.execute('ALTER TABLE courses MODIFY COLUMN level VARCHAR(100) NOT NULL');
+      console.log('Updated courses table level field to VARCHAR');
+    } catch (error) {
+      if (error.code === 'ER_CANT_DROP_FIELD_OR_KEY') {
+        console.log('Level field already updated in courses table');
+      } else {
+        console.error('Error updating level field:', error);
+      }
+    }
 
     // Create course_learners table for many-to-many relationship
     await pool.execute(`

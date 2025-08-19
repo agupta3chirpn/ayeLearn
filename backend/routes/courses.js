@@ -387,7 +387,7 @@ router.post('/', authenticateToken, validateCourse, async (req, res) => {
 router.put('/:id', authenticateToken, [
   body('title').optional().trim().isLength({ max: 255 }).withMessage('Title must be less than 255 characters'),
   body('department').optional().trim().isLength({ max: 100 }).withMessage('Department must be less than 100 characters'),
-  body('level').optional().isIn(['Beginner', 'Intermediate', 'Advanced']).withMessage('Level must be Beginner, Intermediate, or Advanced'),
+  body('level').optional().trim().notEmpty().withMessage('Level is required'),
   body('estimated_duration').optional().trim(),
   body('deadline').optional().trim(),
   body('overview').optional().trim(),
@@ -402,12 +402,15 @@ router.put('/:id', authenticateToken, [
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Update course validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
         errors: errors.array()
       });
     }
+
+    console.log('Updating course with data:', req.body);
 
     const { id } = req.params;
     const {
@@ -476,9 +479,9 @@ router.put('/:id', authenticateToken, [
           `, [
             id,
             module.heading || null,
-            module.videoHeading || null,
-            module.assessmentName || null,
-            module.assessmentLink || null,
+            module.videoHeading || module.video_heading || null,
+            module.assessmentName || module.assessment_name || null,
+            module.assessmentLink || module.assessment_link || null,
             i + 1
           ]);
 
@@ -494,9 +497,9 @@ router.put('/:id', authenticateToken, [
               `, [
                 id,
                 moduleId,
-                doc.fileName,
-                doc.originalName,
-                doc.filePath,
+                doc.fileName || doc.file_name,
+                doc.originalName || doc.original_name,
+                doc.filePath || doc.file_path,
                 'document'
               ]);
             }
@@ -512,9 +515,9 @@ router.put('/:id', authenticateToken, [
               `, [
                 id,
                 moduleId,
-                video.fileName,
-                video.originalName,
-                video.filePath,
+                video.fileName || video.file_name,
+                video.originalName || video.original_name,
+                video.filePath || video.file_path,
                 'video'
               ]);
             }
@@ -532,9 +535,9 @@ router.put('/:id', authenticateToken, [
           `, [
             id,
             null, // No module_id for practice files
-            file.fileName,
-            file.originalName,
-            file.filePath,
+            file.fileName || file.file_name,
+            file.originalName || file.original_name,
+            file.filePath || file.file_path,
             'practice'
           ]);
         }
@@ -545,7 +548,8 @@ router.put('/:id', authenticateToken, [
 
     res.json({
       success: true,
-      message: 'Course updated successfully'
+      message: 'Course updated successfully',
+      courseId: id
     });
   } catch (error) {
     await connection.rollback();
@@ -556,6 +560,57 @@ router.put('/:id', authenticateToken, [
     });
   } finally {
     connection.release();
+  }
+});
+
+// Delete file from server and database
+router.delete('/delete-file', authenticateToken, async (req, res) => {
+  try {
+    const { filePath, fileId } = req.body;
+
+    if (!filePath || !fileId) {
+      return res.status(400).json({
+        success: false,
+        message: 'File path and file ID are required'
+      });
+    }
+
+    // Delete file from filesystem
+    try {
+      const fullPath = path.join(__dirname, '..', filePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+        console.log('File deleted from filesystem:', fullPath);
+      } else {
+        console.log('File not found in filesystem:', fullPath);
+      }
+    } catch (error) {
+      console.error('Error deleting file from filesystem:', error);
+    }
+
+    // Delete file record from database
+    const [result] = await pool.execute(
+      'DELETE FROM course_files WHERE id = ?',
+      [fileId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found in database'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'File deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
   }
 });
 
