@@ -101,9 +101,13 @@ router.get('/', authenticateToken, async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT 
         c.*,
-        COUNT(cl.learner_id) as assigned_learners_count
+        COUNT(cl.learner_id) as assigned_learners_count,
+        COUNT(DISTINCT cm.id) as modules_count,
+        COUNT(DISTINCT cf.id) as files_count
       FROM courses c
       LEFT JOIN course_learners cl ON c.id = cl.course_id
+      LEFT JOIN course_modules cm ON c.id = cm.course_id
+      LEFT JOIN course_files cf ON c.id = cf.course_id
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `);
@@ -170,8 +174,30 @@ router.get('/:id', authenticateToken, async (req, res) => {
       WHERE cl.course_id = ?
     `, [id]);
 
+    // Get modules for this course
+    const [moduleRows] = await pool.execute(`
+      SELECT * FROM course_modules 
+      WHERE course_id = ? 
+      ORDER BY module_order
+    `, [id]);
+
+    // Get files for this course
+    const [fileRows] = await pool.execute(`
+      SELECT * FROM course_files 
+      WHERE course_id = ?
+    `, [id]);
+
     const course = courseRows[0];
     course.assigned_learners = learnerRows;
+    course.modules = moduleRows.map(module => {
+      const moduleFiles = fileRows.filter(file => file.module_id === module.id);
+      return {
+        ...module,
+        documents: moduleFiles.filter(file => file.file_type === 'document'),
+        videos: moduleFiles.filter(file => file.file_type === 'video')
+      };
+    });
+    course.practice_files = fileRows.filter(file => file.file_type === 'practice' && !file.module_id);
 
     res.json({
       success: true,
@@ -188,7 +214,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // Create new course
 router.post('/', authenticateToken, validateCourse, async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
+    await connection.beginTransaction();
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -207,10 +237,15 @@ router.post('/', authenticateToken, validateCourse, async (req, res) => {
       overview,
       learning_objectives,
       assessment_criteria,
-      key_skills
+      key_skills,
+      modules,
+      practiceFiles
     } = req.body;
 
-    const [result] = await pool.execute(`
+
+
+    // Create course
+    const [result] = await connection.execute(`
       INSERT INTO courses (
         title, department, level, estimated_duration, deadline, 
         overview, learning_objectives, assessment_criteria, key_skills
@@ -227,17 +262,101 @@ router.post('/', authenticateToken, validateCourse, async (req, res) => {
       key_skills ? JSON.stringify(key_skills) : null
     ]);
 
+    const courseId = result.insertId;
+
+    // Create modules if provided
+    if (modules && Array.isArray(modules)) {
+      for (let i = 0; i < modules.length; i++) {
+        const module = modules[i];
+        
+        const [moduleResult] = await connection.execute(`
+          INSERT INTO course_modules (
+            course_id, heading, video_heading, assessment_name, assessment_link, module_order
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          courseId,
+          module.heading || null,
+          module.videoHeading || module.video_heading || null,
+          module.assessmentName || module.assessment_name || null,
+          module.assessmentLink || module.assessment_link || null,
+          i + 1
+        ]);
+
+        const moduleId = moduleResult.insertId;
+
+        // Save module documents
+        if (module.documents && Array.isArray(module.documents)) {
+          for (const doc of module.documents) {
+            await connection.execute(`
+              INSERT INTO course_files (
+                course_id, module_id, file_name, original_name, file_path, file_type
+              ) VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+              courseId,
+              moduleId,
+              doc.fileName,
+              doc.originalName,
+              doc.filePath,
+              'document'
+            ]);
+          }
+        }
+
+        // Save module videos
+        if (module.videos && Array.isArray(module.videos)) {
+          for (const video of module.videos) {
+            await connection.execute(`
+              INSERT INTO course_files (
+                course_id, module_id, file_name, original_name, file_path, file_type
+              ) VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+              courseId,
+              moduleId,
+              video.fileName,
+              video.originalName,
+              video.filePath,
+              'video'
+            ]);
+          }
+        }
+      }
+    }
+
+    // Save practice files
+    if (practiceFiles && Array.isArray(practiceFiles)) {
+      for (const file of practiceFiles) {
+        await connection.execute(`
+          INSERT INTO course_files (
+            course_id, module_id, file_name, original_name, file_path, file_type
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          courseId,
+          null, // No module_id for practice files
+          file.fileName,
+          file.originalName,
+          file.filePath,
+          'practice'
+        ]);
+      }
+    }
+
+    await connection.commit();
+
     res.status(201).json({
       success: true,
       message: 'Course created successfully',
-      courseId: result.insertId
+      courseId: courseId
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error creating course:', error);
+
     res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
+  } finally {
+    connection.release();
   }
 });
 
@@ -253,7 +372,11 @@ router.put('/:id', authenticateToken, [
   body('assessment_criteria').optional().isArray().withMessage('Assessment criteria must be an array'),
   body('key_skills').optional().isArray().withMessage('Key skills must be an array')
 ], async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
+    await connection.beginTransaction();
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -273,10 +396,13 @@ router.put('/:id', authenticateToken, [
       overview,
       learning_objectives,
       assessment_criteria,
-      key_skills
+      key_skills,
+      modules,
+      practiceFiles
     } = req.body;
 
-    const [result] = await pool.execute(`
+    // Update course basic info
+    const [result] = await connection.execute(`
       UPDATE courses SET
         title = COALESCE(?, title), 
         department = COALESCE(?, department), 
@@ -309,25 +435,124 @@ router.put('/:id', authenticateToken, [
       });
     }
 
+    // Update modules and files if provided
+    if (modules !== undefined || practiceFiles !== undefined) {
+      // Delete existing modules and files
+      await connection.execute('DELETE FROM course_files WHERE course_id = ?', [id]);
+      await connection.execute('DELETE FROM course_modules WHERE course_id = ?', [id]);
+
+      // Recreate modules if provided
+      if (modules && Array.isArray(modules)) {
+        for (let i = 0; i < modules.length; i++) {
+          const module = modules[i];
+          
+          const [moduleResult] = await connection.execute(`
+            INSERT INTO course_modules (
+              course_id, heading, video_heading, assessment_name, assessment_link, module_order
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+            id,
+            module.heading || null,
+            module.videoHeading || null,
+            module.assessmentName || null,
+            module.assessmentLink || null,
+            i + 1
+          ]);
+
+          const moduleId = moduleResult.insertId;
+
+          // Save module documents
+          if (module.documents && Array.isArray(module.documents)) {
+            for (const doc of module.documents) {
+              await connection.execute(`
+                INSERT INTO course_files (
+                  course_id, module_id, file_name, original_name, file_path, file_type
+                ) VALUES (?, ?, ?, ?, ?, ?)
+              `, [
+                id,
+                moduleId,
+                doc.fileName,
+                doc.originalName,
+                doc.filePath,
+                'document'
+              ]);
+            }
+          }
+
+          // Save module videos
+          if (module.videos && Array.isArray(module.videos)) {
+            for (const video of module.videos) {
+              await connection.execute(`
+                INSERT INTO course_files (
+                  course_id, module_id, file_name, original_name, file_path, file_type
+                ) VALUES (?, ?, ?, ?, ?, ?)
+              `, [
+                id,
+                moduleId,
+                video.fileName,
+                video.originalName,
+                video.filePath,
+                'video'
+              ]);
+            }
+          }
+        }
+      }
+
+      // Save practice files
+      if (practiceFiles && Array.isArray(practiceFiles)) {
+        for (const file of practiceFiles) {
+          await connection.execute(`
+            INSERT INTO course_files (
+              course_id, module_id, file_name, original_name, file_path, file_type
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+            id,
+            null, // No module_id for practice files
+            file.fileName,
+            file.originalName,
+            file.filePath,
+            'practice'
+          ]);
+        }
+      }
+    }
+
+    await connection.commit();
+
     res.json({
       success: true,
       message: 'Course updated successfully'
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating course:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
+  } finally {
+    connection.release();
   }
 });
 
 // Delete course
 router.delete('/:id', authenticateToken, async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
+    await connection.beginTransaction();
+
     const { id } = req.params;
 
-    const [result] = await pool.execute(
+    // Get course files to delete from filesystem
+    const [fileRows] = await connection.execute(
+      'SELECT file_path FROM course_files WHERE course_id = ?',
+      [id]
+    );
+
+    // Delete course (cascade will handle modules and files)
+    const [result] = await connection.execute(
       'DELETE FROM courses WHERE id = ?',
       [id]
     );
@@ -339,16 +564,34 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       });
     }
 
+    // Delete files from filesystem
+    for (const file of fileRows) {
+      try {
+        const filePath = path.join(__dirname, '..', file.file_path);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        // Continue with other files even if one fails
+      }
+    }
+
+    await connection.commit();
+
     res.json({
       success: true,
       message: 'Course deleted successfully'
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error deleting course:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
+  } finally {
+    connection.release();
   }
 });
 

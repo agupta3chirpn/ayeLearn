@@ -92,6 +92,91 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Create course_modules table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS course_modules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        course_id INT NOT NULL,
+        heading VARCHAR(255),
+        video_heading VARCHAR(255),
+        assessment_name VARCHAR(255),
+        assessment_link VARCHAR(500),
+        module_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create course_files table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS course_files (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        course_id INT NOT NULL,
+        module_id INT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_type ENUM('document', 'video', 'practice') NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+        FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Update existing course_files table if it has different structure
+    try {
+      await pool.execute('ALTER TABLE course_files ADD COLUMN original_name VARCHAR(255) NOT NULL DEFAULT ""');
+      console.log('Added original_name column to course_files table');
+    } catch (error) {
+      if (error.code === 'ER_DUP_FIELDNAME') {
+        console.log('original_name column already exists in course_files table');
+      } else {
+        console.error('Error adding original_name column:', error);
+      }
+    }
+
+    try {
+      await pool.execute('ALTER TABLE course_files MODIFY COLUMN file_type ENUM("document", "video", "practice") NOT NULL');
+      console.log('Updated file_type column in course_files table');
+    } catch (error) {
+      console.error('Error updating file_type column:', error);
+    }
+
+    // Remove old columns if they exist
+    try {
+      await pool.execute('ALTER TABLE course_files DROP COLUMN file_size');
+      console.log('Removed file_size column from course_files table');
+    } catch (error) {
+      if (error.code === 'ER_CANT_DROP_FIELD_OR_KEY') {
+        console.log('file_size column does not exist in course_files table');
+      } else {
+        console.error('Error removing file_size column:', error);
+      }
+    }
+
+    try {
+      await pool.execute('ALTER TABLE course_files DROP COLUMN file_category');
+      console.log('Removed file_category column from course_files table');
+    } catch (error) {
+      if (error.code === 'ER_CANT_DROP_FIELD_OR_KEY') {
+        console.log('file_category column does not exist in course_files table');
+      } else {
+        console.error('Error removing file_category column:', error);
+      }
+    }
+
+    try {
+      await pool.execute('ALTER TABLE course_files DROP COLUMN uploaded_at');
+      console.log('Removed uploaded_at column from course_files table');
+    } catch (error) {
+      if (error.code === 'ER_CANT_DROP_FIELD_OR_KEY') {
+        console.log('uploaded_at column does not exist in course_files table');
+      } else {
+        console.error('Error removing uploaded_at column:', error);
+      }
+    }
+
     // Check if default admin exists
     const [rows] = await pool.execute('SELECT * FROM admin_users WHERE email = ?', ['agupta3chirpn@gmail.com']);
     
