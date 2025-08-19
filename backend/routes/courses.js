@@ -118,7 +118,9 @@ const validateCourse = [
 // Get all courses
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const { limit } = req.query;
+    
+    let query = `
       SELECT 
         c.*,
         COUNT(DISTINCT cl.learner_id) as assigned_learners_count,
@@ -130,7 +132,16 @@ router.get('/', authenticateToken, async (req, res) => {
       LEFT JOIN course_files cf ON c.id = cf.course_id
       GROUP BY c.id
       ORDER BY c.created_at DESC
-    `);
+    `;
+    
+    const params = [];
+    
+    if (limit) {
+      query += ' LIMIT ?';
+      params.push(parseInt(limit));
+    }
+
+    const [rows] = await pool.execute(query, params);
 
     res.json({
       success: true,

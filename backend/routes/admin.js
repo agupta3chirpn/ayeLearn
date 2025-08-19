@@ -254,6 +254,68 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
+// Get dashboard statistics
+router.get('/dashboard-stats', authenticateToken, async (req, res) => {
+  try {
+    // Get total active learners
+    const [learnerRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM learners WHERE status = "active"'
+    );
+    const activeLearners = learnerRows[0].count;
+
+    // Get total courses
+    const [courseRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM courses'
+    );
+    const totalCourses = courseRows[0].count;
+
+    // Get learner growth (new learners in last 30 days)
+    const [learnerGrowthRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM learners WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    );
+    const newLearners = learnerGrowthRows[0].count;
+    const learnerGrowth = newLearners > 0 ? `+${newLearners}` : '+0';
+
+    // Get course growth (new courses in last 30 days)
+    const [courseGrowthRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM courses WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    );
+    const newCourses = courseGrowthRows[0].count;
+    const courseGrowth = newCourses > 0 ? `+${newCourses}` : '+0';
+
+    // For now, set placeholder values for assessments and reports
+    // These would be calculated from actual assessment data when available
+    const completedAssessments = 0;
+    const assessmentRate = '0%';
+    const avgScore = '0%';
+    const scoreGrowth = '+0%';
+    const reportsExported = 0;
+    const reportGrowth = '+0';
+
+    res.json({
+      success: true,
+      stats: {
+        activeLearners,
+        totalCourses,
+        learnerGrowth,
+        courseGrowth,
+        completedAssessments,
+        assessmentRate,
+        avgScore,
+        scoreGrowth,
+        reportsExported,
+        reportGrowth
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard statistics'
+    });
+  }
+});
+
 // Get Profile (Protected Route)
 router.get('/profile', authenticateToken, async (req, res) => {
   try {

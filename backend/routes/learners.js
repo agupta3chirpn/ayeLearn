@@ -43,13 +43,24 @@ const upload = multer({
 // Get all learners
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const { limit, sort = 'created_at', order = 'desc' } = req.query;
+    
+    let query = `
       SELECT id, first_name, last_name, email, phone, date_of_birth, 
              gender, department, experience_level, status, avatar_url, 
              created_at, updated_at
       FROM learners 
-      ORDER BY created_at DESC
-    `);
+      ORDER BY ${sort} ${order.toUpperCase()}
+    `;
+    
+    const params = [];
+    
+    if (limit) {
+      query += ' LIMIT ?';
+      params.push(parseInt(limit));
+    }
+
+    const [rows] = await pool.execute(query, params);
 
     res.json({
       success: true,
