@@ -23,7 +23,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", process.env.API_BASE_URL || "http://localhost:5000"],
+      imgSrc: ["'self'", "data:", API_CONFIG.BASE_URL],
       fontSrc: ["'self'", "https:", "data:"],
       connectSrc: ["'self'"],
       frameSrc: ["'none'"],
@@ -48,9 +48,8 @@ app.use('/api/', limiter);
 // CORS configuration
 app.use(cors({
   origin: [
-    'http://localhost:5173', 
-    'http://localhost:3000',
-    process.env.FRONTEND_URL || 'http://localhost:5173'
+    API_CONFIG.FRONTEND_URL,
+    'http://localhost:3000'
   ],
   credentials: true
 }));
@@ -61,7 +60,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static file serving for uploaded images with CORS headers
 app.use('/assets', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', API_CONFIG.FRONTEND_URL);
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -74,7 +73,7 @@ app.use('/assets', (req, res, next) => {
 }, express.static(path.join(__dirname, 'assets')));
 
 app.use('/assets/admin', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', API_CONFIG.FRONTEND_URL);
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -88,7 +87,7 @@ app.use('/assets/admin', (req, res, next) => {
 
 // Static file serving for learner images with CORS headers
 app.use('/assets/learners', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', API_CONFIG.FRONTEND_URL);
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -102,7 +101,7 @@ app.use('/assets/learners', (req, res, next) => {
 
 // Static file serving for course documents with CORS headers
 app.use('/assets/documents', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', API_CONFIG.FRONTEND_URL);
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -160,8 +159,8 @@ const startServer = async () => {
     
     app.listen(PORT, () => {
       console.log(`🚀 ayeLearn Backend API running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔐 Admin API: http://localhost:${PORT}/api/admin`);
+      console.log(`📊 Health check: ${API_CONFIG.BASE_URL}/health`);
+      console.log(`🔐 Admin API: ${API_CONFIG.BASE_URL}/api/admin`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

@@ -314,12 +314,12 @@ const CourseDetails = () => {
                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                      </svg>
-                                                                           <a 
-                                        href={`http://localhost:5000${doc.file_path}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
-                                      >
+                                                                                                                  <a 
+                                         href={`${API_CONFIG.BASE_URL}${doc.file_path}`}
+                                         target="_blank"
+                                         rel="noopener noreferrer"
+                                         className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                                       >
                                         <span>{doc.original_name || doc.file_name || 'Document'}</span>
                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -340,12 +340,12 @@ const CourseDetails = () => {
                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                      </svg>
-                                                                           <a 
-                                        href={`http://localhost:5000${video.file_path}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
-                                      >
+                                                                                                                  <a 
+                                         href={`${API_CONFIG.BASE_URL}${video.file_path}`}
+                                         target="_blank"
+                                         rel="noopener noreferrer"
+                                         className="text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                                       >
                                         <span>{video.original_name || video.file_name || 'Video'}</span>
                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -385,14 +385,27 @@ const CourseDetails = () => {
                </div>
                <p className="text-sm text-gray-600 mb-4">{learners.length} Learners</p>
                
-               <div className="space-y-3">
-                 {Array.isArray(learners) && learners.slice(0, 4).map((learner) => (
-                   <div key={learner.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                     <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                       <span className="text-white text-xs font-medium">
-                         {getInitials(learner.first_name, learner.last_name)}
-                       </span>
-                     </div>
+                               <div className="space-y-3">
+                  {Array.isArray(learners) && learners.slice(0, 4).map((learner) => (
+                    <div key={learner.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                             <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center">
+                         {learner.avatar_url ? (
+                           <img 
+                             src={`${API_CONFIG.BASE_URL}${learner.avatar_url}`}
+                             alt={`${learner.first_name} ${learner.last_name}`}
+                             className="w-full h-full object-cover"
+                             onError={(e) => {
+                               e.target.style.display = 'none';
+                               e.target.nextSibling.style.display = 'flex';
+                             }}
+                           />
+                         ) : null}
+                         <div className={`w-full h-full bg-purple-600 rounded-full flex items-center justify-center ${learner.avatar_url ? 'hidden' : ''}`}>
+                          <span className="text-white text-xs font-medium">
+                            {getInitials(learner.first_name, learner.last_name)}
+                          </span>
+                        </div>
+                      </div>
                      <div className="flex-1">
                        <p className="text-sm font-medium text-gray-900">
                          {learner.first_name} {learner.last_name}

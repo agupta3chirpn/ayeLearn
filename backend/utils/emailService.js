@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const API_CONFIG = require('../config/api');
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -13,7 +14,7 @@ const transporter = nodemailer.createTransport({
 
 const sendPasswordResetEmail = async (email, resetToken) => {
   try {
-    const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
