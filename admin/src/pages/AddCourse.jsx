@@ -49,9 +49,9 @@ const AddCourse = () => {
     estimatedDuration: '',
     deadline: '',
     overview: '',
-    learningObjectives: ['Good Medical Practice and Professional Standards'],
-    assessmentCriteria: ['Good Medical Practice and Professional Standards'],
-    keySkills: ['Good Medical Practice and Professional Standards']
+    learningObjectives: [''],
+    assessmentCriteria: [''],
+    keySkills: ['']
   })
 
   const [errors, setErrors] = useState({})
@@ -62,6 +62,12 @@ const AddCourse = () => {
   })
 
   const [fileUploads, setFileUploads] = useState({
+    documents: [],
+    videos: [],
+    practiceFiles: []
+  })
+
+  const [uploadedFiles, setUploadedFiles] = useState({
     documents: [],
     videos: [],
     practiceFiles: []
@@ -109,103 +115,20 @@ const AddCourse = () => {
     const fetchLearners = async () => {
       setLearnersLoading(true)
       try {
-        console.log('🔄 Fetching learners from:', API_CONFIG.ENDPOINTS.LEARNERS)
+        const response = await axios.get(API_CONFIG.ENDPOINTS.LEARNERS)
         
-        // Try axios first
-        try {
-          const response = await axios.get(API_CONFIG.ENDPOINTS.LEARNERS)
-          
-          console.log('📊 Learners API response:', response.data)
-          console.log('📋 Response status:', response.status)
-          console.log('🔑 Response headers:', response.headers)
-          
-          if (response.data.success) {
-            const learners = response.data.learners || []
-            console.log('✅ Setting available learners:', learners.length, 'learners')
-            console.log('👥 Learners data:', learners)
-            setAvailableLearners(learners)
-          } else {
-            console.error('❌ API returned success: false:', response.data.message)
-            setAvailableLearners([])
-          }
-        } catch (axiosError) {
-          console.error('❌ Axios error, trying fetch:', axiosError)
-          
-          // Fallback to fetch
-          const token = localStorage.getItem('adminToken')
-          const fetchResponse = await fetch(API_CONFIG.ENDPOINTS.LEARNERS, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          
-          const fetchData = await fetchResponse.json()
-          console.log('📊 Fetch response:', fetchData)
-          
-          if (fetchData.success) {
-            const learners = fetchData.learners || []
-            console.log('✅ Setting available learners via fetch:', learners.length, 'learners')
-            setAvailableLearners(learners)
-          } else {
-            console.error('❌ Fetch also failed:', fetchData.message)
-            setAvailableLearners([])
-          }
+        if (response.data.success) {
+          const learners = response.data.data || []
+          setAvailableLearners(learners)
+        } else {
+          console.error('Failed to fetch learners:', response.data.message)
+          setAvailableLearners([])
         }
       } catch (error) {
-        console.error('❌ Error fetching learners:', error)
-        console.error('🔍 Error details:', error.response?.data || error.message)
-        console.error('🌐 Network error:', error.message)
-        
-        // Add sample learners for testing if API fails
-        console.log('🔄 Adding sample learners for testing...')
-        const sampleLearners = [
-          {
-            id: 1,
-            first_name: 'John',
-            last_name: 'Doe',
-            email: 'john.doe@example.com',
-            department: 'Cardiology',
-            experience_level: 'Intermediate'
-          },
-          {
-            id: 2,
-            first_name: 'Jane',
-            last_name: 'Smith',
-            email: 'jane.smith@example.com',
-            department: 'Neurology',
-            experience_level: 'Advanced'
-          },
-          {
-            id: 3,
-            first_name: 'Mike',
-            last_name: 'Johnson',
-            email: 'mike.johnson@example.com',
-            department: 'Pediatrics',
-            experience_level: 'Beginner'
-          },
-          {
-            id: 4,
-            first_name: 'Sarah',
-            last_name: 'Wilson',
-            email: 'sarah.wilson@example.com',
-            department: 'Surgery',
-            experience_level: 'Expert'
-          },
-          {
-            id: 5,
-            first_name: 'David',
-            last_name: 'Brown',
-            email: 'david.brown@example.com',
-            department: 'Emergency Medicine',
-            experience_level: 'Intermediate'
-          }
-        ]
-        console.log('✅ Setting sample learners:', sampleLearners.length, 'learners')
-        setAvailableLearners(sampleLearners)
+        console.error('Error fetching learners:', error)
+        setAvailableLearners([])
       } finally {
         setLearnersLoading(false)
-        console.log('🏁 Learners loading completed')
       }
     }
 
@@ -240,6 +163,28 @@ const AddCourse = () => {
     
     if (!courseDetails.level) {
       newErrors.level = 'Level is required'
+    }
+    
+    if (!courseDetails.overview.trim()) {
+      newErrors.overview = 'Overview is required'
+    }
+    
+    // Validate learning objectives
+    const validLearningObjectives = courseDetails.learningObjectives.filter(obj => obj.trim() !== '')
+    if (validLearningObjectives.length === 0) {
+      newErrors.learningObjectives = 'At least one learning objective is required'
+    }
+    
+    // Validate assessment criteria
+    const validAssessmentCriteria = courseDetails.assessmentCriteria.filter(criteria => criteria.trim() !== '')
+    if (validAssessmentCriteria.length === 0) {
+      newErrors.assessmentCriteria = 'At least one assessment criteria is required'
+    }
+    
+    // Validate key skills
+    const validKeySkills = courseDetails.keySkills.filter(skill => skill.trim() !== '')
+    if (validKeySkills.length === 0) {
+      newErrors.keySkills = 'At least one key skill is required'
     }
     
     setErrors(newErrors)
@@ -405,12 +350,43 @@ const AddCourse = () => {
     )
   }
 
-  const handleFileUpload = (type, files) => {
+  const handleFileUpload = async (type, files) => {
     const fileArray = Array.from(files)
     setFileUploads(prev => ({
       ...prev,
       [type]: [...prev[type], ...fileArray]
     }))
+
+    // Upload files to server
+    for (const file of fileArray) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('type', type)
+        
+        const response = await axios.post(API_CONFIG.ENDPOINTS.UPLOAD_COURSE_FILE, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        })
+        
+        if (response.data.success) {
+          setUploadedFiles(prev => ({
+            ...prev,
+            [type]: [...prev[type], {
+              originalName: file.name,
+              fileName: response.data.fileName,
+              filePath: response.data.filePath,
+              fileType: type
+            }]
+          }))
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        alert(`Failed to upload ${file.name}`)
+      }
+    }
   }
 
   const removeFile = (type, index) => {
@@ -443,13 +419,52 @@ const AddCourse = () => {
     ))
   }
 
-  const handleModuleFileUpload = (moduleId, type, files) => {
+  const handleModuleFileUpload = async (moduleId, type, files) => {
     const fileArray = Array.from(files)
     setModules(prev => prev.map(module => 
       module.id === moduleId 
         ? { ...module, [type]: [...module[type], ...fileArray] }
         : module
     ))
+
+    // Upload files to server
+    for (const file of fileArray) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('type', type)
+        formData.append('moduleId', moduleId)
+        
+        const response = await axios.post(API_CONFIG.ENDPOINTS.UPLOAD_COURSE_FILE, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        })
+        
+        if (response.data.success) {
+          setModules(prev => prev.map(module => 
+            module.id === moduleId 
+              ? { 
+                  ...module, 
+                  uploadedFiles: {
+                    ...module.uploadedFiles,
+                    [type]: [...(module.uploadedFiles?.[type] || []), {
+                      originalName: file.name,
+                      fileName: response.data.fileName,
+                      filePath: response.data.filePath,
+                      fileType: type
+                    }]
+                  }
+                }
+              : module
+          ))
+        }
+      } catch (error) {
+        console.error('Error uploading module file:', error)
+        alert(`Failed to upload ${file.name}`)
+      }
+    }
   }
 
   const removeModuleFile = (moduleId, type, index) => {
@@ -460,9 +475,25 @@ const AddCourse = () => {
     ))
   }
 
+  const validateStep2 = () => {
+    // Check if at least one module has files
+    const hasModuleFiles = modules.some(module => 
+      module.documents.length > 0 || module.videos.length > 0
+    )
+    
+    // Check if practice files are uploaded
+    const hasPracticeFiles = fileUploads.practiceFiles.length > 0
+    
+    return hasModuleFiles || hasPracticeFiles
+  }
+
   const getConfigurationStatus = () => {
-    const detailsComplete = courseDetails.title && courseDetails.department && courseDetails.level
-    const filesComplete = modules.some(module => module.documents.length > 0 || module.videos.length > 0) || fileUploads.practiceFiles.length > 0
+    const detailsComplete = courseDetails.title && courseDetails.department && courseDetails.level && courseDetails.overview.trim() &&
+      courseDetails.learningObjectives.some(obj => obj.trim() !== '') &&
+      courseDetails.assessmentCriteria.some(criteria => criteria.trim() !== '') &&
+      courseDetails.keySkills.some(skill => skill.trim() !== '')
+    
+    const filesComplete = validateStep2()
     const learnersComplete = assignedLearners.length > 0
 
     return {
@@ -487,9 +518,18 @@ const AddCourse = () => {
         estimated_duration: courseDetails.estimatedDuration,
         deadline: courseDetails.deadline,
         overview: courseDetails.overview,
-        learning_objectives: courseDetails.learningObjectives,
-        assessment_criteria: courseDetails.assessmentCriteria,
-        key_skills: courseDetails.keySkills
+        learning_objectives: courseDetails.learningObjectives.filter(obj => obj.trim() !== ''),
+        assessment_criteria: courseDetails.assessmentCriteria.filter(criteria => criteria.trim() !== ''),
+        key_skills: courseDetails.keySkills.filter(skill => skill.trim() !== ''),
+        modules: modules.map(module => ({
+          heading: module.heading,
+          videoHeading: module.videoHeading,
+          assessmentName: module.assessmentName,
+          assessmentLink: module.assessmentLink,
+          documents: module.uploadedFiles?.documents || [],
+          videos: module.uploadedFiles?.videos || []
+        })),
+        practiceFiles: uploadedFiles.practiceFiles
       })
 
       if (!courseResponse.data.success) {
@@ -737,8 +777,18 @@ const AddCourse = () => {
                           onChange={(e) => handleInputChange('overview', e.target.value)}
                           placeholder="Describe what learners will gain from this course..."
                           rows={5}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-gray-400 resize-none"
+                          className={`w-full px-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none ${
+                            errors.overview ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                          }`}
                         />
+                        {errors.overview && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.overview}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -780,6 +830,14 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Learning Objective
                         </button>
+                        {errors.learningObjectives && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.learningObjectives}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -821,6 +879,14 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Assessment Criteria
                         </button>
+                        {errors.assessmentCriteria && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.assessmentCriteria}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -862,6 +928,14 @@ const AddCourse = () => {
                           <Plus className="w-4 h-4 mr-2" />
                           Add Key Skill
                         </button>
+                        {errors.keySkills && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.keySkills}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1108,12 +1182,6 @@ const AddCourse = () => {
 
               {activeTab === 'learners' && (
                 <div className="w-full">
-                  <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
-                    🔍 DEBUG: Step 3 is rendering! Active Tab: {activeTab} | 
-                    Learners Loading: {learnersLoading ? 'Yes' : 'No'} | 
-                    Available Learners: {availableLearners?.length || 0} | 
-                    Filtered Learners: {getFilteredLearners().length}
-                  </div>
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Assign Learners</h2>
                     <p className="text-gray-600">Select learners to enroll in this course</p>
@@ -1395,13 +1463,18 @@ const AddCourse = () => {
                 ) : (
                   <button
                     onClick={() => {
-                      console.log('Button clicked! Current activeTab:', activeTab)
                       if (activeTab === 'details') {
-                        console.log('Setting activeTab to files')
-                        setActiveTab('files')
+                        if (validateForm()) {
+                          setActiveTab('files')
+                        } else {
+                          alert('Please fill in all required fields before continuing.')
+                        }
                       } else if (activeTab === 'files') {
-                        console.log('Setting activeTab to learners')
-                        setActiveTab('learners')
+                        if (validateStep2()) {
+                          setActiveTab('learners')
+                        } else {
+                          alert('Please upload at least one file (module files or practice files) before continuing.')
+                        }
                       }
                     }}
                     className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 flex items-center justify-center font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"

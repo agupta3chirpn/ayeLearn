@@ -2,8 +2,85 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
+
+// Configure multer for course file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../assets/documents');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'course-file-' + uniqueSuffix + ext);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf', 
+    'text/plain', 
+    'application/msword', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'video/mp4',
+    'video/avi',
+    'video/mov',
+    'video/wmv',
+    'image/jpeg',
+    'image/jpg',
+    'image/png'
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Upload course file
+router.post('/upload-course-file', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const filePath = `/assets/documents/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      message: 'File uploaded successfully',
+      fileName: req.file.filename,
+      filePath: filePath,
+      originalName: req.file.originalname,
+      fileType: req.body.type || 'document'
+    });
+  } catch (error) {
+    console.error('Error uploading course file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload file'
+    });
+  }
+});
 
 // Validation middleware
 const validateCourse = [
