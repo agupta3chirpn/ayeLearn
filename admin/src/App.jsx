@@ -13,6 +13,7 @@ import EditLearner from './pages/EditLearner'
 import Courses from './pages/Courses'
 import AddCourse from './pages/AddCourse'
 import EditCourse from './pages/EditCourse'
+import CourseDetails from './pages/CourseDetails'
 import Departments from './pages/Departments'
 import AddDepartment from './pages/AddDepartment'
 import EditDepartment from './pages/EditDepartment'
@@ -111,6 +112,14 @@ function App() {
             element={
               <PrivateRoute>
                 <EditCourse />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/course/:id" 
+            element={
+              <PrivateRoute>
+                <CourseDetails />
               </PrivateRoute>
             } 
           />

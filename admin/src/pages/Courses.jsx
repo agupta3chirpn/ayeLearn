@@ -25,6 +25,7 @@ const Courses = () => {
   const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(9)
+  const [deletingCourseId, setDeletingCourseId] = useState(null)
 
 
 
@@ -96,7 +97,12 @@ const Courses = () => {
   }
 
   const handleDeleteCourse = async (courseId) => {
-    if (window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+    const course = courses.find(c => c.id === courseId)
+    const courseTitle = course?.title || 'this course'
+    
+    if (window.confirm(`Are you sure you want to delete "${courseTitle}"?\n\nThis will permanently remove:\n• All course data\n• All uploaded files\n• All module information\n• All learner assignments\n\nThis action cannot be undone.`)) {
+      setDeletingCourseId(courseId)
+      
       try {
         const response = await axios.delete(`${API_CONFIG.ENDPOINTS.COURSES}/${courseId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
@@ -105,13 +111,21 @@ const Courses = () => {
         if (response.data.success) {
           // Remove the course from the list
           setCourses(prev => prev.filter(course => course.id !== courseId))
-          alert('Course deleted successfully')
+          
+          // Show detailed success message
+          const details = response.data.details
+          const successMessage = `Course "${details.courseTitle}" deleted successfully!\n\nDeleted:\n• ${details.deletedLearners} learner assignments\n• ${details.deletedFiles} file records\n• ${details.deletedModules} module records\n• ${details.deletedFilesFromFS} files from storage`
+          
+          alert(successMessage)
         } else {
           alert('Failed to delete course: ' + response.data.message)
         }
       } catch (error) {
         console.error('Error deleting course:', error)
-        alert('Failed to delete course. Please try again.')
+        const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred'
+        alert(`Failed to delete course: ${errorMessage}`)
+      } finally {
+        setDeletingCourseId(null)
       }
     }
   }
@@ -246,12 +260,23 @@ const Courses = () => {
                       </Link>
                       <button 
                         onClick={() => handleDeleteCourse(course.id)}
-                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                        title="Delete Course"
+                        disabled={deletingCourseId === course.id}
+                        className={`p-1 rounded transition-colors ${
+                          deletingCourseId === course.id 
+                            ? 'text-gray-400 cursor-not-allowed' 
+                            : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                        }`}
+                        title={deletingCourseId === course.id ? "Deleting..." : "Delete Course"}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        {deletingCourseId === course.id ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -275,9 +300,14 @@ const Courses = () => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getLevelColor(course.level)}`}>
                       {course.level}
                     </span>
-                    <Link to={`/courses/${course.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
-                      View Course <ArrowRight className="w-4 h-4 ml-1" />
-                    </Link>
+                    <div className="flex items-center space-x-2">
+                      <Link 
+                        to={`/course/${course.id}`}
+                        className="bg-purple-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+                      >
+                        View Details <ArrowRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))

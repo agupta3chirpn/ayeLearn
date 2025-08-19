@@ -623,19 +623,59 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     const { id } = req.params;
 
-    // Get course files to delete from filesystem
+    console.log(`Starting deletion of course ID: ${id}`);
+
+    // First, get all course files to delete from filesystem
     const [fileRows] = await connection.execute(
-      'SELECT file_path FROM course_files WHERE course_id = ?',
+      'SELECT file_path, file_name FROM course_files WHERE course_id = ?',
       [id]
     );
 
-    // Delete course (cascade will handle modules and files)
-    const [result] = await connection.execute(
+    console.log(`Found ${fileRows.length} files to delete`);
+
+    // Get course details for logging
+    const [courseRows] = await connection.execute(
+      'SELECT title FROM courses WHERE id = ?',
+      [id]
+    );
+
+    if (courseRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    const courseTitle = courseRows[0].title;
+
+    // Delete course_learners entries
+    const [learnerResult] = await connection.execute(
+      'DELETE FROM course_learners WHERE course_id = ?',
+      [id]
+    );
+    console.log(`Deleted ${learnerResult.affectedRows} learner assignments`);
+
+    // Delete course_files entries
+    const [fileResult] = await connection.execute(
+      'DELETE FROM course_files WHERE course_id = ?',
+      [id]
+    );
+    console.log(`Deleted ${fileResult.affectedRows} file records`);
+
+    // Delete course_modules entries
+    const [moduleResult] = await connection.execute(
+      'DELETE FROM course_modules WHERE course_id = ?',
+      [id]
+    );
+    console.log(`Deleted ${moduleResult.affectedRows} module records`);
+
+    // Finally, delete the course itself
+    const [courseResult] = await connection.execute(
       'DELETE FROM courses WHERE id = ?',
       [id]
     );
 
-    if (result.affectedRows === 0) {
+    if (courseResult.affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: 'Course not found'
@@ -643,30 +683,51 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     // Delete files from filesystem
+    let deletedFilesCount = 0;
     for (const file of fileRows) {
       try {
         const filePath = path.join(__dirname, '..', file.file_path);
+        console.log(`Attempting to delete file: ${filePath}`);
+        
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
+          console.log(`Successfully deleted file: ${file.file_name}`);
+          deletedFilesCount++;
+        } else {
+          console.log(`File not found on filesystem: ${filePath}`);
         }
       } catch (error) {
-        console.error('Error deleting file:', error);
+        console.error(`Error deleting file ${file.file_name}:`, error);
         // Continue with other files even if one fails
       }
     }
 
     await connection.commit();
 
+    console.log(`Course "${courseTitle}" (ID: ${id}) deleted successfully`);
+    console.log(`- Deleted ${learnerResult.affectedRows} learner assignments`);
+    console.log(`- Deleted ${fileResult.affectedRows} file records`);
+    console.log(`- Deleted ${moduleResult.affectedRows} module records`);
+    console.log(`- Deleted ${deletedFilesCount} files from filesystem`);
+
     res.json({
       success: true,
-      message: 'Course deleted successfully'
+      message: 'Course deleted successfully',
+      details: {
+        courseTitle,
+        deletedLearners: learnerResult.affectedRows,
+        deletedFiles: fileResult.affectedRows,
+        deletedModules: moduleResult.affectedRows,
+        deletedFilesFromFS: deletedFilesCount
+      }
     });
   } catch (error) {
     await connection.rollback();
     console.error('Error deleting course:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error',
+      error: error.message
     });
   } finally {
     connection.release();
