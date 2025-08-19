@@ -18,9 +18,27 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const timestamp = Date.now();
     const ext = path.extname(file.originalname);
-    cb(null, 'course-file-' + uniqueSuffix + ext);
+    const fileType = req.body.type || 'document';
+    
+    // Generate unique filename based on file type
+    let prefix;
+    switch (fileType) {
+      case 'practiceFiles':
+        prefix = 'practice';
+        break;
+      case 'documents':
+        prefix = 'document';
+        break;
+      case 'videos':
+        prefix = 'video';
+        break;
+      default:
+        prefix = 'file';
+    }
+    
+    cb(null, `${prefix}_${timestamp}${ext}`);
   }
 });
 
@@ -64,6 +82,7 @@ router.post('/upload-course-file', authenticateToken, upload.single('file'), asy
     }
 
     const filePath = `/assets/documents/${req.file.filename}`;
+    const fileType = req.body.type || 'document';
 
     res.json({
       success: true,
@@ -71,7 +90,8 @@ router.post('/upload-course-file', authenticateToken, upload.single('file'), asy
       fileName: req.file.filename,
       filePath: filePath,
       originalName: req.file.originalname,
-      fileType: req.body.type || 'document'
+      fileType: fileType,
+      fileSize: req.file.size
     });
   } catch (error) {
     console.error('Error uploading course file:', error);

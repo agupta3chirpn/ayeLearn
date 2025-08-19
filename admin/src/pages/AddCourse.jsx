@@ -73,6 +73,14 @@ const AddCourse = () => {
     practiceFiles: []
   })
 
+  const [fileValidation, setFileValidation] = useState({
+    practiceFiles: { isValid: true, message: '' }
+  })
+
+  const [totalFileSize, setTotalFileSize] = useState(0)
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
+  const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50MB total
+
   const [modules, setModules] = useState([
     {
       id: 1,
@@ -350,19 +358,76 @@ const AddCourse = () => {
     )
   }
 
+  const validateFile = (file, type) => {
+    const allowedTypes = {
+      practiceFiles: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      documents: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      videos: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv']
+    }
+
+    // Check file type
+    if (!allowedTypes[type].includes(file.type)) {
+      return {
+        isValid: false,
+        message: `Invalid file type. Allowed types: ${type === 'practiceFiles' ? 'PDF, DOC, DOCX, TXT' : type === 'documents' ? 'PDF, DOC, DOCX, TXT' : 'MP4, AVI, MOV, WMV'}`
+      }
+    }
+
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        isValid: false,
+        message: `File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`
+      }
+    }
+
+    // Check total size
+    const currentTotalSize = totalFileSize + file.size
+    if (currentTotalSize > MAX_TOTAL_SIZE) {
+      return {
+        isValid: false,
+        message: `Total file size would exceed ${MAX_TOTAL_SIZE / (1024 * 1024)}MB limit`
+      }
+    }
+
+    return { isValid: true, message: '' }
+  }
+
   const handleFileUpload = async (type, files) => {
     const fileArray = Array.from(files)
+    
+    // Validate all files first
+    for (const file of fileArray) {
+      const validation = validateFile(file, type)
+      if (!validation.isValid) {
+        setFileValidation(prev => ({
+          ...prev,
+          [type]: validation
+        }))
+        return
+      }
+    }
+
+    // Clear validation errors
+    setFileValidation(prev => ({
+      ...prev,
+      [type]: { isValid: true, message: '' }
+    }))
+
+    // Update file uploads and total size
     setFileUploads(prev => ({
       ...prev,
       [type]: [...prev[type], ...fileArray]
     }))
+
+    setTotalFileSize(prev => prev + fileArray.reduce((sum, file) => sum + file.size, 0))
 
     // Upload files to server
     for (const file of fileArray) {
       try {
         const formData = new FormData()
         formData.append('file', file)
-        formData.append('type', type)
+        formData.append('type', type) // This will be 'practiceFiles', 'documents', or 'videos'
         
         const response = await axios.post(API_CONFIG.ENDPOINTS.UPLOAD_COURSE_FILE, formData, {
           headers: {
@@ -378,21 +443,69 @@ const AddCourse = () => {
               originalName: file.name,
               fileName: response.data.fileName,
               filePath: response.data.filePath,
-              fileType: type
+              fileType: response.data.fileType,
+              fileSize: response.data.fileSize || file.size
             }]
           }))
         }
       } catch (error) {
         console.error('Error uploading file:', error)
-        alert(`Failed to upload ${file.name}`)
+        // Remove file from uploads if server upload failed
+        setFileUploads(prev => ({
+          ...prev,
+          [type]: prev[type].filter(f => f.name !== file.name)
+        }))
+        setTotalFileSize(prev => prev - file.size)
+        setFileValidation(prev => ({
+          ...prev,
+          [type]: { isValid: false, message: `Failed to upload ${file.name}` }
+        }))
       }
     }
   }
 
   const removeFile = (type, index) => {
+    const fileToRemove = fileUploads[type][index]
+    
     setFileUploads(prev => ({
       ...prev,
       [type]: prev[type].filter((_, i) => i !== index)
+    }))
+
+    // Update total file size
+    setTotalFileSize(prev => prev - (fileToRemove.size || 0))
+
+    // Remove from uploaded files if exists
+    setUploadedFiles(prev => ({
+      ...prev,
+      [type]: prev[type].filter((_, i) => i !== index)
+    }))
+
+    // Clear validation errors
+    setFileValidation(prev => ({
+      ...prev,
+      [type]: { isValid: true, message: '' }
+    }))
+  }
+
+  const clearAllPracticeFiles = () => {
+    const practiceFilesSize = fileUploads.practiceFiles.reduce((sum, file) => sum + (file.size || 0), 0)
+    
+    setFileUploads(prev => ({
+      ...prev,
+      practiceFiles: []
+    }))
+
+    setUploadedFiles(prev => ({
+      ...prev,
+      practiceFiles: []
+    }))
+
+    setTotalFileSize(prev => prev - practiceFilesSize)
+
+    setFileValidation(prev => ({
+      ...prev,
+      practiceFiles: { isValid: true, message: '' }
     }))
   }
 
@@ -421,18 +534,40 @@ const AddCourse = () => {
 
   const handleModuleFileUpload = async (moduleId, type, files) => {
     const fileArray = Array.from(files)
+    
+    // Validate all files first
+    for (const file of fileArray) {
+      const validation = validateFile(file, type)
+      if (!validation.isValid) {
+        setFileValidation(prev => ({
+          ...prev,
+          [`module_${moduleId}_${type}`]: validation
+        }))
+        return
+      }
+    }
+
+    // Clear validation errors
+    setFileValidation(prev => ({
+      ...prev,
+      [`module_${moduleId}_${type}`]: { isValid: true, message: '' }
+    }))
+
+    // Update modules and total size
     setModules(prev => prev.map(module => 
       module.id === moduleId 
         ? { ...module, [type]: [...module[type], ...fileArray] }
         : module
     ))
 
+    setTotalFileSize(prev => prev + fileArray.reduce((sum, file) => sum + file.size, 0))
+
     // Upload files to server
     for (const file of fileArray) {
       try {
         const formData = new FormData()
         formData.append('file', file)
-        formData.append('type', type)
+        formData.append('type', type) // This will be 'documents' or 'videos'
         formData.append('moduleId', moduleId)
         
         const response = await axios.post(API_CONFIG.ENDPOINTS.UPLOAD_COURSE_FILE, formData, {
@@ -453,7 +588,8 @@ const AddCourse = () => {
                       originalName: file.name,
                       fileName: response.data.fileName,
                       filePath: response.data.filePath,
-                      fileType: type
+                      fileType: response.data.fileType,
+                      fileSize: response.data.fileSize || file.size
                     }]
                   }
                 }
@@ -462,17 +598,54 @@ const AddCourse = () => {
         }
       } catch (error) {
         console.error('Error uploading module file:', error)
-        alert(`Failed to upload ${file.name}`)
+        // Remove file from modules if server upload failed
+        setModules(prev => prev.map(module => 
+          module.id === moduleId 
+            ? { ...module, [type]: module[type].filter(f => f.name !== file.name) }
+            : module
+        ))
+        setTotalFileSize(prev => prev - file.size)
+        setFileValidation(prev => ({
+          ...prev,
+          [`module_${moduleId}_${type}`]: { isValid: false, message: `Failed to upload ${file.name}` }
+        }))
       }
     }
   }
 
   const removeModuleFile = (moduleId, type, index) => {
+    const module = modules.find(m => m.id === moduleId)
+    const fileToRemove = module?.[type]?.[index]
+    
     setModules(prev => prev.map(module => 
       module.id === moduleId 
         ? { ...module, [type]: module[type].filter((_, i) => i !== index) }
         : module
     ))
+
+    // Update total file size
+    if (fileToRemove?.size) {
+      setTotalFileSize(prev => prev - fileToRemove.size)
+    }
+
+    // Remove from uploaded files if exists
+    setModules(prev => prev.map(module => 
+      module.id === moduleId 
+        ? { 
+            ...module, 
+            uploadedFiles: {
+              ...module.uploadedFiles,
+              [type]: module.uploadedFiles?.[type]?.filter((_, i) => i !== index) || []
+            }
+          }
+        : module
+    ))
+
+    // Clear validation errors
+    setFileValidation(prev => ({
+      ...prev,
+      [`module_${moduleId}_${type}`]: { isValid: true, message: '' }
+    }))
   }
 
   const validateStep2 = () => {
@@ -484,7 +657,10 @@ const AddCourse = () => {
     // Check if practice files are uploaded
     const hasPracticeFiles = fileUploads.practiceFiles.length > 0
     
-    return hasModuleFiles || hasPracticeFiles
+    // Check if there are any validation errors
+    const hasValidationErrors = Object.values(fileValidation).some(validation => !validation.isValid)
+    
+    return (hasModuleFiles || hasPracticeFiles) && !hasValidationErrors
   }
 
   const getConfigurationStatus = () => {
@@ -1006,27 +1182,47 @@ const AddCourse = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Upload Documents
                                 </label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+                                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                                  fileValidation[`module_${module.id}_documents`]?.isValid !== false
+                                    ? 'border-gray-300 hover:border-blue-400' 
+                                    : 'border-red-300 bg-red-50'
+                                }`}>
                                   <input
                                     type="file"
                                     accept=".pdf,.txt,.doc,.docx"
                                     onChange={(e) => handleModuleFileUpload(module.id, 'documents', e.target.files)}
                                     className="hidden"
                                     id={`document-upload-${module.id}`}
+                                    multiple
                                   />
                                   <label htmlFor={`document-upload-${module.id}`} className="cursor-pointer">
                                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-600">Click to upload PDF or Text files</p>
-                                    <p className="text-xs text-gray-500">Maximum file size: 1MB</p>
+                                    <p className="text-sm text-gray-600">Click to upload multiple PDF, DOC, DOCX, or TXT files</p>
+                                    <p className="text-xs text-gray-500">Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB</p>
                                   </label>
                                 </div>
+                                
+                                {/* Validation Error */}
+                                {fileValidation[`module_${module.id}_documents`]?.isValid === false && (
+                                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div className="flex items-center">
+                                      <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+                                      <p className="text-sm text-red-600">{fileValidation[`module_${module.id}_documents`].message}</p>
+                                    </div>
+                                  </div>
+                                )}
                                 {module.documents.length > 0 && (
                                   <div className="mt-4 space-y-2">
                                     {module.documents.map((file, index) => (
                                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                                         <div className="flex items-center space-x-3">
                                           <FileText className="w-4 h-4 text-blue-500" />
-                                          <span className="text-sm text-gray-700">{file.name}</span>
+                                          <div>
+                                            <span className="text-sm text-gray-700 font-medium">{file.name}</span>
+                                            <p className="text-xs text-gray-500">
+                                              {(file.size / (1024 * 1024)).toFixed(2)}MB
+                                            </p>
+                                          </div>
                                         </div>
                                         <button
                                           onClick={() => removeModuleFile(module.id, 'documents', index)}
@@ -1057,27 +1253,47 @@ const AddCourse = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Upload Videos
                                 </label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                                  fileValidation[`module_${module.id}_videos`]?.isValid !== false
+                                    ? 'border-gray-300 hover:border-red-400' 
+                                    : 'border-red-300 bg-red-50'
+                                }`}>
                                   <input
                                     type="file"
                                     accept=".mp4,.avi,.mov,.wmv"
                                     onChange={(e) => handleModuleFileUpload(module.id, 'videos', e.target.files)}
                                     className="hidden"
                                     id={`video-upload-${module.id}`}
+                                    multiple
                                   />
                                   <label htmlFor={`video-upload-${module.id}`} className="cursor-pointer">
                                     <FileVideo className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-600">Click to upload Video files</p>
-                                    <p className="text-xs text-gray-500">Maximum file size: 1MB</p>
+                                    <p className="text-sm text-gray-600">Click to upload multiple video files</p>
+                                    <p className="text-xs text-gray-500">Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB</p>
                                   </label>
                                 </div>
+                                
+                                {/* Validation Error */}
+                                {fileValidation[`module_${module.id}_videos`]?.isValid === false && (
+                                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div className="flex items-center">
+                                      <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+                                      <p className="text-sm text-red-600">{fileValidation[`module_${module.id}_videos`].message}</p>
+                                    </div>
+                                  </div>
+                                )}
                                 {module.videos.length > 0 && (
                                   <div className="mt-4 space-y-2">
                                     {module.videos.map((file, index) => (
                                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                                         <div className="flex items-center space-x-3">
                                           <FileVideo className="w-4 h-4 text-red-500" />
-                                          <span className="text-sm text-gray-700">{file.name}</span>
+                                          <div>
+                                            <span className="text-sm text-gray-700 font-medium">{file.name}</span>
+                                            <p className="text-xs text-gray-500">
+                                              {(file.size / (1024 * 1024)).toFixed(2)}MB
+                                            </p>
+                                          </div>
                                         </div>
                                         <button
                                           onClick={() => removeModuleFile(module.id, 'videos', index)}
@@ -1120,11 +1336,21 @@ const AddCourse = () => {
 
                     {/* Practice Files */}
                     <div className="bg-gray-50 rounded-lg p-6">
-                      <div className="flex items-center mb-6">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                          <FileImage className="w-4 h-4 text-green-600" />
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                            <FileImage className="w-4 h-4 text-green-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900">Practice Files</h3>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">Practice Files</h3>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">
+                            Total Size: {(totalFileSize / (1024 * 1024)).toFixed(2)}MB / {(MAX_TOTAL_SIZE / (1024 * 1024)).toFixed(0)}MB
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB
+                          </p>
+                        </div>
                       </div>
                       
                       <div className="space-y-4">
@@ -1132,27 +1358,62 @@ const AddCourse = () => {
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Upload Practice Files
                           </label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-400 transition-colors">
+                          <div className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                            fileValidation.practiceFiles.isValid 
+                              ? 'border-gray-300 hover:border-green-400' 
+                              : 'border-red-300 bg-red-50'
+                          }`}>
                             <input
                               type="file"
                               accept=".pdf,.txt,.doc,.docx"
                               onChange={(e) => handleFileUpload('practiceFiles', e.target.files)}
                               className="hidden"
                               id="practice-files-upload"
+                              multiple
                             />
                             <label htmlFor="practice-files-upload" className="cursor-pointer">
                               <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                              <p className="text-sm text-gray-600 mb-1">Click to upload PDF or Text files</p>
-                              <p className="text-xs text-gray-500">Maximum file size: 5MB</p>
+                              <p className="text-sm text-gray-600 mb-1">Click to upload multiple PDF, DOC, DOCX, or TXT files</p>
+                              <p className="text-xs text-gray-500">
+                                Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB | Total limit: {MAX_TOTAL_SIZE / (1024 * 1024)}MB
+                              </p>
                             </label>
                           </div>
+                          
+                          {/* Validation Error */}
+                          {!fileValidation.practiceFiles.isValid && (
+                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex items-center">
+                                <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+                                <p className="text-sm text-red-600">{fileValidation.practiceFiles.message}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* File List */}
                           {fileUploads.practiceFiles.length > 0 && (
                             <div className="mt-4 space-y-2">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-medium text-gray-700">
+                                  Uploaded Files ({fileUploads.practiceFiles.length})
+                                </h4>
+                                <button
+                                  onClick={clearAllPracticeFiles}
+                                  className="text-sm text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Clear All
+                                </button>
+                              </div>
                               {fileUploads.practiceFiles.map((file, index) => (
                                 <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
                                   <div className="flex items-center space-x-3">
                                     <FileText className="w-4 h-4 text-green-500" />
-                                    <span className="text-sm text-gray-700">{file.name}</span>
+                                    <div>
+                                      <span className="text-sm text-gray-700 font-medium">{file.name}</span>
+                                      <p className="text-xs text-gray-500">
+                                        {(file.size / (1024 * 1024)).toFixed(2)}MB
+                                      </p>
+                                    </div>
                                   </div>
                                   <button
                                     onClick={() => removeFile('practiceFiles', index)}
@@ -1167,10 +1428,16 @@ const AddCourse = () => {
                         </div>
                         
                         <div className="flex space-x-4">
-                          <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
-                            Add File
+                          <button 
+                            onClick={() => document.getElementById('practice-files-upload').click()}
+                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          >
+                            Add More Files
                           </button>
-                          <button className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                          <button 
+                            onClick={clearAllPracticeFiles}
+                            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                          >
                             Cancel
                           </button>
                         </div>
@@ -1473,7 +1740,17 @@ const AddCourse = () => {
                         if (validateStep2()) {
                           setActiveTab('learners')
                         } else {
-                          alert('Please upload at least one file (module files or practice files) before continuing.')
+                          // Check for specific validation errors
+                          const hasValidationErrors = Object.values(fileValidation).some(validation => !validation.isValid)
+                          if (hasValidationErrors) {
+                            const errorMessages = Object.values(fileValidation)
+                              .filter(validation => !validation.isValid)
+                              .map(validation => validation.message)
+                              .join(', ')
+                            alert(`File validation errors: ${errorMessages}`)
+                          } else {
+                            alert('Please upload at least one file (module files or practice files) before continuing.')
+                          }
                         }
                       }
                     }}
