@@ -106,7 +106,7 @@ router.post('/upload-course-file', authenticateToken, upload.single('file'), asy
 const validateCourse = [
   body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 255 }).withMessage('Title must be less than 255 characters'),
   body('department').trim().notEmpty().withMessage('Department is required'),
-  body('level').isIn(['Beginner', 'Intermediate', 'Advanced']).withMessage('Level must be Beginner, Intermediate, or Advanced'),
+  body('level').trim().notEmpty().withMessage('Level is required'),
   body('estimated_duration').optional().trim(),
   body('deadline').optional().trim(),
   body('overview').optional().trim(),
@@ -241,12 +241,15 @@ router.post('/', authenticateToken, validateCourse, async (req, res) => {
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
         errors: errors.array()
       });
     }
+
+    console.log('Received course data:', req.body);
 
     const {
       title,

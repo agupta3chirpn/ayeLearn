@@ -744,7 +744,7 @@ const AddCourse = () => {
     setLoading(true)
     try {
       // Create course
-      const courseResponse = await axios.post(API_CONFIG.ENDPOINTS.COURSES, {
+      const courseData = {
         title: courseDetails.title,
         department: courseDetails.department,
         level: courseDetails.level,
@@ -763,7 +763,11 @@ const AddCourse = () => {
           videos: module.uploadedFiles?.videos || []
         })),
         practiceFiles: uploadedFiles.practiceFiles
-      })
+      }
+      
+      console.log('Sending course data:', courseData);
+      
+      const courseResponse = await axios.post(API_CONFIG.ENDPOINTS.COURSES, courseData)
 
       if (!courseResponse.data.success) {
         throw new Error(courseResponse.data.message || 'Failed to create course')
