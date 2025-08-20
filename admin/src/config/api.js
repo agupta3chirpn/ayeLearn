@@ -7,11 +7,18 @@ export const API_CONFIG = {
     // Admin endpoints
     ADMIN_LOGIN: `${API_BASE_URL}/api/admin/login`,
     ADMIN_PROFILE: `${API_BASE_URL}/api/admin/profile`,
+    ADMIN_PROFILE_UPLOAD_IMAGE: `${API_BASE_URL}/api/admin/profile/upload-image`,
     ADMIN_DASHBOARD: `${API_BASE_URL}/api/admin/dashboard`,
+    ADMIN_FORGOT_PASSWORD: `${API_BASE_URL}/api/admin/forgot-password`,
+    ADMIN_RESET_PASSWORD: `${API_BASE_URL}/api/admin/reset-password`,
+    ADMIN_DASHBOARD_STATS: `${API_BASE_URL}/api/admin/dashboard-stats`,
     
     // Learner endpoints
     LEARNERS: `${API_BASE_URL}/api/learners`,
+    LEARNER_LOGIN: `${API_BASE_URL}/api/learners/login`,
+    LEARNER_FORGOT_PASSWORD: `${API_BASE_URL}/api/learners/forgot-password`,
     LEARNER_UPLOAD_IMAGE: `${API_BASE_URL}/api/learners/upload-image`,
+    LEARNER_COURSES: `${API_BASE_URL}/api/learners`,
     
     // Course endpoints
     COURSES: `${API_BASE_URL}/api/courses`,

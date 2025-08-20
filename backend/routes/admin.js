@@ -62,7 +62,7 @@ router.post('/login', [
     const { email, password } = req.body;
 
     const [rows] = await pool.execute(
-      'SELECT id, email, password_hash FROM admin_users WHERE email = ?',
+      'SELECT id, email, password_hash, first_name, last_name, phone_number, profile_image FROM admin_users WHERE email = ?',
       [email]
     );
 
@@ -95,7 +95,11 @@ router.post('/login', [
       token,
       admin: {
         id: admin.id,
-        email: admin.email
+        email: admin.email,
+        first_name: admin.first_name,
+        last_name: admin.last_name,
+        phone_number: admin.phone_number,
+        profile_image: admin.profile_image
       }
     });
   } catch (error) {

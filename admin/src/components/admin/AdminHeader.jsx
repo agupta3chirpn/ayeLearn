@@ -1,87 +1,54 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { Link, useLocation } from 'react-router-dom'
 import { Bell, ChevronDown, User } from 'lucide-react'
-import Logo from './Logo'
-import { API_CONFIG } from '../config/api'
-import ConfirmPopup from './shared/ConfirmPopup'
+import Logo from '../Logo'
+import { API_CONFIG } from '../../config/api'
+import ConfirmPopup from '../shared/ConfirmPopup'
 
-const Header = () => {
+const AdminHeader = () => {
   const { logout } = useAuth()
   const location = useLocation()
-  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [isLearner, setIsLearner] = useState(false)
-  const [learner, setLearner] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  // Check authentication type and fetch profile data
+  // Fetch admin profile data
   useEffect(() => {
-    const checkAuth = async () => {
-      const adminToken = localStorage.getItem('adminToken')
-      const learnerToken = localStorage.getItem('learnerToken')
-      const learnerData = localStorage.getItem('learnerData')
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('adminToken')
+        if (!token) return
 
-      if (learnerToken && learnerData) {
-        try {
-          const parsedData = JSON.parse(learnerData)
-          setLearner(parsedData)
-          setIsLearner(true)
-          setProfile(parsedData)
-        } catch (error) {
-          console.error('Error parsing learner data:', error)
-        }
-        setLoading(false)
-      } else if (adminToken) {
-        try {
-          const response = await fetch(API_CONFIG.ENDPOINTS.ADMIN_PROFILE, {
-            headers: {
-              'Authorization': `Bearer ${adminToken}`
-            }
-          })
-          
-          const data = await response.json()
-          
-          if (data.success) {
-            setProfile(data.profile)
+        const response = await fetch(API_CONFIG.ENDPOINTS.ADMIN_PROFILE, {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        } catch (error) {
-          console.error('Error fetching profile:', error)
-        } finally {
-          setLoading(false)
+        })
+        
+        const data = await response.json()
+        
+        if (data.success) {
+          setProfile(data.profile)
         }
-      } else {
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+      } finally {
         setLoading(false)
       }
     }
 
-    checkAuth()
+    fetchProfile()
   }, [])
 
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Dashboard'
-    if (location.pathname.includes('/learner/dashboard')) return 'Learner Dashboard'
-    if (location.pathname.includes('/learner/courses')) return 'My Courses'
-    if (location.pathname.includes('/learner/profile')) return 'Profile'
     if (location.pathname.includes('/learners')) return 'Learners'
     if (location.pathname.includes('/courses')) return 'Courses'
     if (location.pathname.includes('/departments')) return 'Departments'
     if (location.pathname.includes('/experience-levels')) return 'Experience Levels'
     if (location.pathname.includes('/profile')) return 'Profile'
-    return isLearner ? 'Learner Portal' : 'Admin Panel'
-  }
-
-  const handleLogout = () => {
-    if (isLearner) {
-      localStorage.removeItem('learnerToken')
-      localStorage.removeItem('learnerData')
-      localStorage.removeItem('adminToken')
-      localStorage.removeItem('adminUser')
-      navigate('/learner/login')
-    } else {
-      logout()
-    }
+    return 'Admin Panel'
   }
 
   const handleLogoutClick = () => {
@@ -89,7 +56,7 @@ const Header = () => {
   }
 
   const handleLogoutConfirm = () => {
-    handleLogout()
+    logout()
     setShowLogoutConfirm(false)
   }
 
@@ -127,16 +94,12 @@ const Header = () => {
               </div>
               <div className="text-sm">
                 <div className="font-medium text-gray-900">
-                  {isLearner 
-                    ? `${learner?.firstName} ${learner?.lastName}`
-                    : profile?.first_name && profile?.last_name 
-                      ? `${profile.first_name} ${profile.last_name}`
-                      : profile?.email || 'Admin User'
+                  {profile?.first_name && profile?.last_name 
+                    ? `${profile.first_name} ${profile.last_name}`
+                    : profile?.email || 'Admin User'
                   }
                 </div>
-                <div className="text-gray-500">
-                  {isLearner ? learner?.email : profile?.email || 'Loading...'}
-                </div>
+                <div className="text-gray-500">{profile?.email || 'Loading...'}</div>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400" />
             </div>
@@ -144,10 +107,7 @@ const Header = () => {
             {/* Profile Dropdown */}
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <div className="py-2">
-                <Link 
-                  to={isLearner ? "/learner/profile" : "/profile"} 
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
+                <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                   Profile Settings
                 </Link>
                 <button 
@@ -177,4 +137,4 @@ const Header = () => {
   )
 }
 
-export default Header
+export default AdminHeader

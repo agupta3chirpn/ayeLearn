@@ -30,3 +30,4 @@ Rules:
 23. Create an identical UI for the content form with the same validations and display server-side validation errors directly below each input and select field, following the existing pattern.
 24. http://localhost:5000/  ->  call this url by configuration file for admin folder.
 25. Use header and side bar all page by components.
+26.  use the same popup pattern.

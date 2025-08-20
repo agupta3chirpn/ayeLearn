@@ -554,4 +554,158 @@ router.get('/:id/courses', authenticateToken, async (req, res) => {
   }
 });
 
+// Learner Login
+router.post('/login', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please enter a valid email address'),
+  body('password')
+    .isLength({ min: 1 })
+    .withMessage('Password is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: errors.array()
+      });
+    }
+
+    const { email, password } = req.body;
+
+    // Find learner by email
+    const [rows] = await pool.execute(
+      'SELECT * FROM learners WHERE email = ? AND status = "active"',
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    const learner = rows[0];
+
+    // Check if learner has a password
+    if (!learner.password_hash) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account not properly set up. Please contact administrator.'
+      });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, learner.password_hash);
+
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Generate JWT token
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      { 
+        id: learner.id, 
+        email: learner.email, 
+        role: 'learner',
+        firstName: learner.first_name,
+        lastName: learner.last_name
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    // Return learner data (excluding password)
+    const learnerData = {
+      id: learner.id,
+      firstName: learner.first_name,
+      lastName: learner.last_name,
+      email: learner.email,
+      phone: learner.phone,
+      dateOfBirth: learner.date_of_birth,
+      gender: learner.gender,
+      department: learner.department,
+      experienceLevel: learner.experience_level,
+      status: learner.status,
+      avatarUrl: learner.avatar_url,
+      createdAt: learner.created_at,
+      updatedAt: learner.updated_at
+    };
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      data: learnerData
+    });
+  } catch (error) {
+    console.error('Learner login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get learner profile (authenticated)
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is a learner
+    if (req.user.role !== 'learner') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Learner role required.'
+      });
+    }
+
+    const [rows] = await pool.execute(
+      'SELECT * FROM learners WHERE id = ?',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Learner not found'
+      });
+    }
+
+    const learner = rows[0];
+    const learnerData = {
+      id: learner.id,
+      firstName: learner.first_name,
+      lastName: learner.last_name,
+      email: learner.email,
+      phone: learner.phone,
+      dateOfBirth: learner.date_of_birth,
+      gender: learner.gender,
+      department: learner.department,
+      experienceLevel: learner.experience_level,
+      status: learner.status,
+      avatarUrl: learner.avatar_url,
+      createdAt: learner.created_at,
+      updatedAt: learner.updated_at
+    };
+
+    res.json({
+      success: true,
+      data: learnerData
+    });
+  } catch (error) {
+    console.error('Error fetching learner profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch learner profile'
+    });
+  }
+});
+
 module.exports = router;

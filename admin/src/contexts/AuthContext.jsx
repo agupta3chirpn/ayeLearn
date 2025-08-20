@@ -53,15 +53,18 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    // Clear all authentication tokens to prevent conflicts
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminUser')
+    localStorage.removeItem('learnerToken')
+    localStorage.removeItem('learnerData')
     delete axios.defaults.headers.common['Authorization']
     setUser(null)
   }
 
   const forgotPassword = async (email) => {
     try {
-      await axios.post(`${API_CONFIG.BASE_URL}/api/admin/forgot-password`, { email })
+              await axios.post(API_CONFIG.ENDPOINTS.ADMIN_FORGOT_PASSWORD, { email })
       return { success: true }
     } catch (error) {
       return {
@@ -73,7 +76,7 @@ export const AuthProvider = ({ children }) => {
 
   const resetPassword = async (token, password) => {
     try {
-      await axios.post(`${API_CONFIG.BASE_URL}/api/admin/reset-password/${token}`, { password })
+              await axios.post(`${API_CONFIG.ENDPOINTS.ADMIN_RESET_PASSWORD}/${token}`, { password })
       return { success: true }
     } catch (error) {
       return {

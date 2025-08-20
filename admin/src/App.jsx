@@ -2,24 +2,32 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import PrivateRoute from './components/PrivateRoute'
 import PublicRoute from './components/PublicRoute'
-import Login from './pages/Login'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import Dashboard from './pages/Dashboard'
-import Profile from './pages/Profile'
-import Learners from './pages/Learners'
-import AddLearner from './pages/AddLearner'
-import EditLearner from './pages/EditLearner'
-import Courses from './pages/Courses'
-import AddCourse from './pages/AddCourse'
-import EditCourse from './pages/EditCourse'
-import CourseDetails from './pages/CourseDetails'
-import Departments from './pages/Departments'
-import AddDepartment from './pages/AddDepartment'
-import EditDepartment from './pages/EditDepartment'
-import ExperienceLevels from './pages/ExperienceLevels'
-import AddExperienceLevel from './pages/AddExperienceLevel'
-import EditExperienceLevel from './pages/EditExperienceLevel'
+import LearnerPrivateRoute from './components/LearnerPrivateRoute'
+// Admin Module Imports
+import Login from './pages/admin/Login'
+import ForgotPassword from './pages/admin/ForgotPassword'
+import ResetPassword from './pages/admin/ResetPassword'
+import Dashboard from './pages/admin/Dashboard'
+import Profile from './pages/admin/Profile'
+import Learners from './pages/admin/Learners'
+import AddLearner from './pages/admin/AddLearner'
+import EditLearner from './pages/admin/EditLearner'
+import Courses from './pages/admin/Courses'
+import AddCourse from './pages/admin/AddCourse'
+import EditCourse from './pages/admin/EditCourse'
+import CourseDetails from './pages/admin/CourseDetails'
+import Departments from './pages/admin/Departments'
+import AddDepartment from './pages/admin/AddDepartment'
+import EditDepartment from './pages/admin/EditDepartment'
+import ExperienceLevels from './pages/admin/ExperienceLevels'
+import AddExperienceLevel from './pages/admin/AddExperienceLevel'
+import EditExperienceLevel from './pages/admin/EditExperienceLevel'
+// Learner Module Imports
+import LearnerLogin from './pages/learner/Login'
+import LearnerDashboard from './pages/learner/Dashboard'
+import LearnerProfile from './pages/learner/Profile'
+import LearnerCourses from './pages/learner/Courses'
+import LearnerForgotPassword from './pages/learner/ForgotPassword'
 
 
 function App() {
@@ -172,6 +180,40 @@ function App() {
                 </PrivateRoute>
               } 
             />
+
+          {/* Learner Module Routes */}
+          <Route 
+            path="/learner/login" 
+            element={<LearnerLogin />}
+          />
+          <Route 
+            path="/learner/forgot-password" 
+            element={<LearnerForgotPassword />}
+          />
+          <Route 
+            path="/learner/dashboard" 
+            element={
+              <LearnerPrivateRoute>
+                <LearnerDashboard />
+              </LearnerPrivateRoute>
+            }
+          />
+          <Route 
+            path="/learner/profile" 
+            element={
+              <LearnerPrivateRoute>
+                <LearnerProfile />
+              </LearnerPrivateRoute>
+            }
+          />
+          <Route 
+            path="/learner/courses" 
+            element={
+              <LearnerPrivateRoute>
+                <LearnerCourses />
+              </LearnerPrivateRoute>
+            }
+          />
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
