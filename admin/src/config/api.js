@@ -22,6 +22,7 @@ export const API_CONFIG = {
     
     // Course endpoints
     COURSES: `${API_BASE_URL}/api/courses`,
+    COURSE_LEARNERS: `${API_BASE_URL}/api/courses/course-learners`,
     UPLOAD_COURSE_FILE: `${API_BASE_URL}/api/courses/upload-course-file`,
     
     // Department endpoints

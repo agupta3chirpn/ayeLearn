@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { 
   BookOpen, 
   Clock, 
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import LearnerLayout from '../../components/learner/LearnerLayout'
 import axios from 'axios'
+import { API_CONFIG } from '../../config/api'
 import ConfirmPopup from '../../components/shared/ConfirmPopup'
 
 const LearnerDashboard = () => {
@@ -37,6 +38,9 @@ const LearnerDashboard = () => {
         const parsedData = JSON.parse(learnerData)
         setLearner(parsedData)
         fetchDashboardData(parsedData.id)
+        
+        // Update browser tab title
+        document.title = `Learner Dashboard | ayeLearn`
       } catch (error) {
         console.error('Error parsing learner data:', error)
         navigate('/learner/login')
@@ -55,16 +59,28 @@ const LearnerDashboard = () => {
       
       if (coursesResponse.data.success) {
         const courses = coursesResponse.data.data
-        setRecentCourses(courses.slice(0, 5)) // Get latest 5 courses
+        const summary = coursesResponse.data.summary
         
-        // Calculate stats
+        // Sort courses by priority: in progress first, then by assignment date
+        const sortedCourses = courses.sort((a, b) => {
+          if (a.status === 'in_progress' && b.status !== 'in_progress') return -1
+          if (b.status === 'in_progress' && a.status !== 'in_progress') return 1
+          return new Date(b.assigned_at) - new Date(a.assigned_at)
+        })
+        
+        setRecentCourses(sortedCourses.slice(0, 6)) // Get latest 6 courses
+        
+        // Calculate enhanced stats
         setStats({
-          totalCourses: courses.length,
-          completedCourses: courses.filter(course => course.status === 'completed').length,
-          inProgressCourses: courses.filter(course => course.status === 'in_progress').length,
+          totalCourses: summary.total_courses,
+          completedCourses: summary.completed_courses,
+          inProgressCourses: summary.in_progress_courses,
           averageScore: courses.length > 0 
             ? Math.round(courses.reduce((sum, course) => sum + (course.score || 0), 0) / courses.length)
-            : 0
+            : 0,
+          averageProgress: summary.average_progress,
+          totalModules: summary.total_modules,
+          totalFiles: summary.total_files
         })
       }
     } catch (error) {
@@ -108,182 +124,143 @@ const LearnerDashboard = () => {
   return (
     <LearnerLayout>
       <div className="p-6">
-            {/* Welcome Section */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Welcome back, {learner?.firstName}!
-              </h1>
-              <p className="text-gray-600">
-                Here's what's happening with your learning journey today.
-              </p>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                    <BookOpen className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Courses</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                    <Award className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Completed</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.completedCourses}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
-                    <Clock className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">In Progress</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.inProgressCourses}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                    <TrendingUp className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Avg Score</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.averageScore}%</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Profile Card */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <div className="text-center mb-6">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center mx-auto mb-4">
-                      <User className="w-12 h-12 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {learner?.firstName} {learner?.lastName}
-                    </h3>
-                    <p className="text-gray-600">{learner?.email}</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center">
-                      <Phone className="w-4 h-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-600">{learner?.phone || 'Not provided'}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Building className="w-4 h-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-600">{learner?.department}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <GraduationCap className="w-4 h-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-600">{learner?.experienceLevel}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-600">
-                        Member since {new Date(learner?.createdAt).toLocaleDateString()}
+        {/* Assigned Courses Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">My Assigned Courses</h2>
+            <Link to="/learner/courses" className="text-purple-600 hover:text-purple-700 font-medium">
+              View All Courses &gt;
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {recentCourses.length > 0 ? (
+              recentCourses.map((course) => (
+                <div key={course.id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-shadow">
+                  <div className="mb-4">
+                    {/* Course Status Badge */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        course.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        course.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {course.status === 'completed' ? 'Completed' :
+                         course.status === 'in_progress' ? 'In Progress' :
+                         'Not Started'}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {course.completed_modules || 0}/{course.total_modules || 0}
                       </span>
                     </div>
-                  </div>
-
-                  {/* Logout Button */}
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={handleLogoutClick}
-                      className="w-full flex items-center justify-center px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Courses */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">Recent Courses</h3>
-                    <button className="text-purple-600 hover:text-purple-700 font-medium">
-                      View All
-                    </button>
-                  </div>
-
-                  {recentCourses.length > 0 ? (
-                    <div className="space-y-4">
-                      {recentCourses.map((course) => (
-                        <div key={course.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                              <BookOpen className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-gray-900">{course.title}</h4>
-                              <p className="text-sm text-gray-600">{course.department} • {course.level}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              course.status === 'completed' 
-                                ? 'bg-green-100 text-green-800'
-                                : course.status === 'in_progress'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {course.status === 'completed' ? 'Completed' : 
-                               course.status === 'in_progress' ? 'In Progress' : 'Not Started'}
-                            </span>
-                            {course.score && (
-                              <p className="text-sm text-gray-600 mt-1">{course.score}%</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    
+                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                      {course.title || 'Untitled Course'}
+                    </h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-600">{course.department || 'General'}</span>
+                      <span className="text-sm text-gray-600">•</span>
+                      <span className="text-sm text-gray-600">{course.level || 'Beginner'}</span>
                     </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No courses assigned yet.</p>
-                      <p className="text-sm text-gray-500">Contact your administrator to get started.</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500">
+                        {course.total_modules || 0} modules • {course.total_files || 0} files
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {course.course_type || 'Course'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Complete by {course.due_date ? new Date(course.due_date).toLocaleDateString() : 'No due date'}
+                    </p>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500">Progress</span>
+                      <span className="text-xs font-medium text-gray-700">{course.progress_percentage || 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${course.progress_percentage || 0}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Clock className="w-4 h-4 mr-1" />
+                      {course.duration || '4 weeks'}
+                    </div>
+                    <div className="flex space-x-2">
+                      <Link
+                        to={`/learner/courses/${course.id}`}
+                        className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                      >
+                        {course.status === 'completed' ? 'View Details' : 'Continue Course'} &gt;
+                      </Link>
+                    </div>
+                  </div>
+                  
+                  {/* Course Stats */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>Files: {course.total_files || 0}</span>
+                      <span>Modules: {course.total_modules || 0}</span>
+                      {course.certificate_available && (
+                        <span className="text-green-600">✓ Certificate</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Score Display */}
+                  {course.score && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Score:</span>
+                        <span className="text-sm font-medium text-green-600">{course.score}%</span>
+                      </div>
                     </div>
                   )}
                 </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No courses assigned yet</h3>
+                <p className="text-gray-600 mb-4">Contact your administrator to get started with your learning journey.</p>
+                <Link
+                  to="/learner/courses"
+                  className="inline-flex items-center px-4 py-2 text-white rounded-lg font-medium transition-all duration-200"
+                  style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #9333ea 100%)' }}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Browse Available Courses
+                </Link>
               </div>
-            </div>
+            )}
           </div>
-          
-          {/* Logout Confirmation Popup */}
-          <ConfirmPopup
-            isOpen={showLogoutConfirm}
-            onClose={() => setShowLogoutConfirm(false)}
-            onConfirm={handleLogoutConfirm}
-            title="Confirm Logout"
-            message="Are you sure you want to logout? You will be redirected to the login page."
-            type="confirm"
-            confirmText="Logout"
-            cancelText="Cancel"
-          />
-        </LearnerLayout>
-    )
-  }
+        </div>
+      </div>
+      
+      {/* Logout Confirmation Popup */}
+      <ConfirmPopup
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Confirm Logout"
+        message="Are you sure you want to logout? You will be redirected to the login page."
+        type="confirm"
+        confirmText="Logout"
+        cancelText="Cancel"
+      />
+    </LearnerLayout>
+  )
+}
 
 export default LearnerDashboard

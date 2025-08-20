@@ -16,6 +16,7 @@ import Courses from './pages/admin/Courses'
 import AddCourse from './pages/admin/AddCourse'
 import EditCourse from './pages/admin/EditCourse'
 import CourseDetails from './pages/admin/CourseDetails'
+import CourseLearners from './pages/admin/CourseLearners'
 import Departments from './pages/admin/Departments'
 import AddDepartment from './pages/admin/AddDepartment'
 import EditDepartment from './pages/admin/EditDepartment'
@@ -27,6 +28,7 @@ import LearnerLogin from './pages/learner/Login'
 import LearnerDashboard from './pages/learner/Dashboard'
 import LearnerProfile from './pages/learner/Profile'
 import LearnerCourses from './pages/learner/Courses'
+import LearnerCourseDetails from './pages/learner/CourseDetails'
 import LearnerForgotPassword from './pages/learner/ForgotPassword'
 
 
@@ -131,6 +133,14 @@ function App() {
               </PrivateRoute>
             } 
           />
+          <Route 
+            path="/course-learners" 
+            element={
+              <PrivateRoute>
+                <CourseLearners />
+              </PrivateRoute>
+            } 
+          />
 
           <Route 
             path="/departments" 
@@ -211,6 +221,14 @@ function App() {
             element={
               <LearnerPrivateRoute>
                 <LearnerCourses />
+              </LearnerPrivateRoute>
+            }
+          />
+          <Route 
+            path="/learner/courses/:courseId" 
+            element={
+              <LearnerPrivateRoute>
+                <LearnerCourseDetails />
               </LearnerPrivateRoute>
             }
           />

@@ -156,6 +156,99 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// Get all course_learners relationships
+router.get('/course-learners', authenticateToken, async (req, res) => {
+  try {
+    const { course_id, learner_id, limit, offset } = req.query;
+    
+    let query = `
+      SELECT 
+        cl.id,
+        cl.course_id,
+        cl.learner_id,
+        cl.assigned_at,
+        c.title as course_title,
+        c.department as course_department,
+        c.level as course_level,
+        l.first_name as learner_first_name,
+        l.last_name as learner_last_name,
+        l.email as learner_email,
+        l.department as learner_department,
+        l.experience_level as learner_experience_level
+      FROM course_learners cl
+      INNER JOIN courses c ON cl.course_id = c.id
+      INNER JOIN learners l ON cl.learner_id = l.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    if (course_id) {
+      query += ' AND cl.course_id = ?';
+      params.push(parseInt(course_id));
+    }
+    
+    if (learner_id) {
+      query += ' AND cl.learner_id = ?';
+      params.push(parseInt(learner_id));
+    }
+    
+    query += ' ORDER BY cl.assigned_at DESC';
+    
+    if (limit) {
+      query += ' LIMIT ?';
+      params.push(parseInt(limit));
+      
+      if (offset) {
+        query += ' OFFSET ?';
+        params.push(parseInt(offset));
+      }
+    }
+
+    const [rows] = await pool.execute(query, params);
+
+    // Get total count for pagination
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM course_learners cl
+      INNER JOIN courses c ON cl.course_id = c.id
+      INNER JOIN learners l ON cl.learner_id = l.id
+      WHERE 1=1
+    `;
+    
+    const countParams = [];
+    
+    if (course_id) {
+      countQuery += ' AND cl.course_id = ?';
+      countParams.push(parseInt(course_id));
+    }
+    
+    if (learner_id) {
+      countQuery += ' AND cl.learner_id = ?';
+      countParams.push(parseInt(learner_id));
+    }
+    
+    const [countRows] = await pool.execute(countQuery, countParams);
+    const total = countRows[0].total;
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        total,
+        limit: limit ? parseInt(limit) : null,
+        offset: offset ? parseInt(offset) : null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching course_learners:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Get learners assigned to a course (MUST come before /:id route)
 router.get('/:id/learners', authenticateToken, async (req, res) => {
   try {

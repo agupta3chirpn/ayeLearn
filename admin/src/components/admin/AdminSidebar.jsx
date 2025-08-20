@@ -67,6 +67,19 @@ const AdminSidebar = () => {
             <span>Courses</span>
           </Link>
           
+          <Link 
+            to="/course-learners" 
+            className={`flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
+              isActivePath('/course-learners') 
+                ? 'text-white' 
+                : 'text-gray-600 hover:text-white hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]'
+            }`}
+            style={isActivePath('/course-learners') ? { background: 'linear-gradient(90deg, color(display-p3 0.576 0.200 0.918) 0%, color(display-p3 0.231 0.510 0.965) 100%)' } : {}}
+          >
+            <Users className="w-5 h-5 mr-3" />
+            <span>Course Learners</span>
+          </Link>
+          
           <a href="#" className="flex items-center px-3 py-2 text-gray-600 hover:text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[color(display-p3_0.576_0.200_0.918)] hover:to-[color(display-p3_0.231_0.510_0.965)]">
             <GraduationCap className="w-5 h-5 mr-3" />
             <span>Aye Assess</span>

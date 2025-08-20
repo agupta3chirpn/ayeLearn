@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import LearnerLayout from '../../components/learner/LearnerLayout'
 import axios from 'axios'
+import { API_CONFIG } from '../../config/api'
 
 const LearnerProfile = () => {
   const [learner, setLearner] = useState(null)
@@ -52,6 +53,10 @@ const LearnerProfile = () => {
           department: parsedData.department || '',
           experienceLevel: parsedData.experienceLevel || ''
         })
+        
+        // Update browser tab title with learner ID
+        document.title = `Learner Profile - ID: ${parsedData.id} | ayeLearn`
+        
         setLoading(false)
       } catch (error) {
         console.error('Error parsing learner data:', error)
@@ -127,33 +132,39 @@ const LearnerProfile = () => {
                   <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
                   <p className="text-gray-600">Manage your account information</p>
                 </div>
-                {!isEditing ? (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </button>
-                ) : (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </button>
+                <div className="flex items-center space-x-4">
+                  <div className="bg-gradient-to-r from-purple-500 to-blue-600 text-white px-4 py-2 rounded-lg">
+                    <div className="text-sm font-medium">Learner ID</div>
+                    <div className="text-xl font-bold">{learner?.id}</div>
                   </div>
-                )}
+                  {!isEditing ? (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </button>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={handleCancel}
+                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -169,8 +180,8 @@ const LearnerProfile = () => {
                     <h3 className="text-xl font-bold text-gray-900">
                       {learner?.firstName} {learner?.lastName}
                     </h3>
-                    <p className="text-gray-600">{learner?.email}</p>
-                    <p className="text-sm text-gray-500 mt-2">
+                                         <p className="text-gray-600">{learner?.email}</p>
+                     <p className="text-sm text-gray-500 mt-2">
                       Member since {new Date(learner?.createdAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -182,8 +193,8 @@ const LearnerProfile = () => {
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-6">Personal Information</h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* First Name */}
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     {/* First Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         First Name
