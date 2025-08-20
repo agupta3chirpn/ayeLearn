@@ -44,6 +44,7 @@ const initializeDatabase = async () => {
         experience_level ENUM('Beginner', 'Intermediate', 'Advanced'),
         status ENUM('active', 'inactive') DEFAULT 'active',
         avatar_url VARCHAR(255),
+        password_hash VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
@@ -58,6 +59,18 @@ const initializeDatabase = async () => {
         console.log('Status column already exists in learners table');
       } else {
         console.error('Error adding status column:', error);
+      }
+    }
+
+    // Add password_hash column to existing learners table if it doesn't exist
+    try {
+      await pool.execute('ALTER TABLE learners ADD COLUMN password_hash VARCHAR(255)');
+      console.log('Password hash column added to learners table');
+    } catch (error) {
+      if (error.code === 'ER_DUP_FIELDNAME') {
+        console.log('Password hash column already exists in learners table');
+      } else {
+        console.error('Error adding password hash column:', error);
       }
     }
 

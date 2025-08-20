@@ -12,7 +12,8 @@ import {
   Building,
   TrendingUp,
   User,
-  ChevronDown
+  ChevronDown,
+  Lock
 } from 'lucide-react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
@@ -32,7 +33,9 @@ const EditLearner = () => {
     phone: '',
     department: '',
     experienceLevel: '',
-    status: 'active'
+    status: 'active',
+    password: '',
+    confirmPassword: ''
   })
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -192,6 +195,21 @@ const EditLearner = () => {
     setLoading(true)
     setSubmitError('')
     
+    // Validate passwords if provided
+    if (formData.password || formData.confirmPassword) {
+      if (formData.password !== formData.confirmPassword) {
+        setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }))
+        setLoading(false)
+        return
+      }
+
+      if (formData.password.length < 6) {
+        setErrors(prev => ({ ...prev, password: 'Password must be at least 6 characters long' }))
+        setLoading(false)
+        return
+      }
+    }
+    
     try {
       // Upload image first if selected
       let avatarUrl = null
@@ -217,6 +235,12 @@ const EditLearner = () => {
         department: formData.department,
         experience_level: formData.experienceLevel,
         status: formData.status
+      }
+
+      // Add password fields if provided
+      if (formData.password) {
+        submitData.password = formData.password
+        submitData.confirmPassword = formData.confirmPassword
       }
 
       // Add avatar URL if new image was uploaded
@@ -634,6 +658,60 @@ const EditLearner = () => {
                               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                             <p className="text-sm text-red-600 font-medium">{errors.phone}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Password (Leave blank to keep current)
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            placeholder="Enter new password"
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          />
+                        </div>
+                        {errors.password && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.password}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Confirm Password
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="password"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleInputChange}
+                            placeholder="Confirm new password"
+                            className={`w-full pl-10 pr-4 py-3 border rounded-lg transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              errors.confirmPassword ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          />
+                        </div>
+                        {errors.confirmPassword && (
+                          <div className="mt-2 flex items-center">
+                            <svg className="h-4 w-4 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">{errors.confirmPassword}</p>
                           </div>
                         )}
                       </div>

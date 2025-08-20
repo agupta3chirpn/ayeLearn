@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
@@ -207,7 +208,18 @@ router.post('/', [
   body('status')
     .optional()
     .isIn(['active', 'inactive'])
-    .withMessage('Status must be either active or inactive')
+    .withMessage('Status must be either active or inactive'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
+  body('confirmPassword')
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error('Password confirmation does not match password');
+      }
+      return true;
+    })
+    .withMessage('Password confirmation does not match password')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -221,7 +233,7 @@ router.post('/', [
 
     const {
       first_name, last_name, email, phone, date_of_birth,
-      gender, department, experience_level, status
+      gender, department, experience_level, status, password
     } = req.body;
 
 
@@ -239,11 +251,14 @@ router.post('/', [
       });
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     const [result] = await pool.execute(`
       INSERT INTO learners (first_name, last_name, email, phone, date_of_birth, 
-                           gender, department, experience_level, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [first_name, last_name, email, phone || null, date_of_birth || null, gender || null, department, experience_level, status || 'active']);
+                           gender, department, experience_level, status, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [first_name, last_name, email, phone || null, date_of_birth || null, gender || null, department, experience_level, status || 'active', hashedPassword]);
 
     const [newLearner] = await pool.execute(
       'SELECT * FROM learners WHERE id = ?',
@@ -289,7 +304,14 @@ router.put('/:id', [
     }
     return true;
   }).withMessage('Please select a valid Experience Level'),
-  body('status').optional().isIn(['active', 'inactive']).withMessage('Status must be either active or inactive')
+  body('status').optional().isIn(['active', 'inactive']).withMessage('Status must be either active or inactive'),
+  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+  body('confirmPassword').optional().custom((value, { req }) => {
+    if (req.body.password && value !== req.body.password) {
+      throw new Error('Password confirmation does not match password');
+    }
+    return true;
+  }).withMessage('Password confirmation does not match password')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -330,6 +352,15 @@ router.put('/:id', [
           message: 'Email already exists'
         });
       }
+    }
+
+    // Handle password hashing if password is provided
+    if (updateData.password) {
+      updateData.password_hash = await bcrypt.hash(updateData.password, 12);
+      delete updateData.password;
+      delete updateData.confirmPassword;
+    } else {
+      delete updateData.confirmPassword;
     }
 
     // Build update query dynamically
